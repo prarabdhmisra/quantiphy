@@ -53,13 +53,21 @@ numbers are real (measured on all 3,289 test rows); detection accuracy is comple
   the whole average undefined.
 * Aggregate ensembles in **log space**, never an arithmetic mean.
 
+## Team
+
+**Vector Syndicate** — 2 people. Organizer email **sent 2026-08-01** (contents in
+`ORGANIZER-EMAIL.md`).
+
 ## Blockers
 
-1. **The organizer email is drafted but unsent** (`ORGANIZER-EMAIL.md`). This is the real blocker:
-   the linked "submission template" is a validation *output* file, the test parquet has **no ID
-   column**, and server-side scoring is unverified (`leaderboard.html` 404s). The solver can get
-   arbitrarily good and we still cannot form a valid submission.
-2. Register the team — use a **gmail address**, the site pre-expires .edu confirmation links.
+1. **Awaiting the organizers' reply.** Three answers gate a valid submission: how test rows are
+   identified (the parquet has **no ID column** and the linked "template" is a validation *output*
+   file), whether server-side scoring is actually live (`leaderboard.html` 404s), and which
+   deadline is real. **Chase by email if there's no reply within ~a week** — the development phase
+   ends early October and this cannot be left unresolved.
+2. Log the answers here when they arrive, then build the submission writer against the real schema.
+
+**Not blocked meanwhile:** the smoke test and validation run need none of this. Keep going.
 
 ## Next actions, in order
 
