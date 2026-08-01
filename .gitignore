@@ -1,0 +1,28 @@
+# Video clips are large (~528 MB) and freely re-downloadable from the Hub. Colab and HF Jobs
+# fetch them on the remote machine anyway, so they never belong in the repo.
+data/videos/
+data/*.log
+
+# Detection caches: regenerable, and large.
+*.pkl
+detections*
+
+# Predictions and submissions are run outputs, not source.
+data/runs/
+submissions/
+*.submission.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Never commit credentials.
+.env
+*.token

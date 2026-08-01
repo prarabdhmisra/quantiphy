@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quantiphy-solver"
+version = "0.1.0"
+description = "Geometric solver for the QuantiPhy Challenge (NeurIPS 2026)"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "pandas>=2.0"]
+
+[project.optional-dependencies]
+# The GPU stack is optional so the CPU core (units, parsing, geometry, scoring) stays installable
+# and testable anywhere -- including inside CI and on the laptop.
+vision = ["torch>=2.1", "transformers>=4.41", "accelerate", "opencv-python-headless", "pillow"]
+dev = ["pytest>=8", "pyarrow"]
+
+[tool.setuptools.packages.find]
+include = ["quantiphy*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
