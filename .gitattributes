@@ -1,0 +1,4 @@
+# The submission template is a contract, not source. Its SHA-256 is recorded in
+# data/fixtures/README.md and re-checked against the live file before we submit, so git must not
+# rewrite its line endings -- otherwise the hash depends on which platform cloned the repo.
+data/fixtures/quantiphy_submission_template.csv -text
