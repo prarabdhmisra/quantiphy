@@ -70,7 +70,25 @@ def install_solver() -> None:
 
     if git_source:
         log(f"installing solver from {git_source}")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", git_source])
+        # `hf jobs uv run` executes inside an ephemeral uv environment with no pip in it, so
+        # `python -m pip` fails outright there. Try uv first, then pip for anywhere else this runs
+        # (Colab, Kaggle, a plain venv), then a bare clone onto sys.path -- the package only needs
+        # numpy and pandas, which the inline script metadata above already guarantees.
+        attempts = (["uv", "pip", "install", "-q", "--python", sys.executable, git_source],
+                    [sys.executable, "-m", "pip", "install", "-q", git_source])
+        for command in attempts:
+            try:
+                subprocess.check_call(command)
+                return
+            except (subprocess.CalledProcessError, FileNotFoundError, OSError) as error:
+                log(f"  {command[0]} install failed ({error}); trying the next option")
+
+        checkout = WORK / "src"
+        url = git_source.removeprefix("git+")
+        log(f"  falling back to a plain clone of {url}")
+        if not checkout.exists():
+            subprocess.check_call(["git", "clone", "--depth", "1", url, str(checkout)])
+        sys.path.insert(0, str(checkout))
         return
     if hub_source:
         from huggingface_hub import snapshot_download
