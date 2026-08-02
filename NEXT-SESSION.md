@@ -24,7 +24,7 @@ Last worked: **2026-08-01**. Nothing is in flight — no running jobs, no uncomm
 | | |
 |---|---|
 | Repo | https://github.com/prarabdhmisra/quantiphy (public, MIT) |
-| Tests | 79 passing (`py -3.12 -m pytest tests/ -q`) |
+| Tests | 94 passing (`py -3.12 -m pytest tests/ -q`) |
 | Plan | `~/.claude/plans/inherited-doodling-sun.md` |
 | Track | **B (Open-Weight)** primary, A secondary |
 | Deadline | **Plan for Oct 1, 2026** (site advertises Nov 5, but its own timeline finalizes rankings mid-October) |
@@ -58,16 +58,31 @@ numbers are real (measured on all 3,289 test rows); detection accuracy is comple
 **Vector Syndicate** — 2 people. Organizer email **sent 2026-08-01** (contents in
 `ORGANIZER-EMAIL.md`).
 
-## Blockers
+## Organizers' reply — 2026-08-02
 
-1. **Awaiting the organizers' reply.** Three answers gate a valid submission: how test rows are
-   identified (the parquet has **no ID column** and the linked "template" is a validation *output*
-   file), whether server-side scoring is actually live (`leaderboard.html` 404s), and which
-   deadline is real. **Chase by email if there's no reply within ~a week** — the development phase
-   ends early October and this cannot be left unresolved.
-2. Log the answers here when they arrive, then build the submission writer against the real schema.
+They answered two of the six questions. **Neither blocker remains.**
 
-**Not blocked meanwhile:** the smoke test and validation run need none of this. Keep going.
+1. **Submission format: solved.** They posted a real template at
+   `https://quantiphy.stanford.edu/competition/eval/quantiphy_submission_template.csv`, now pinned
+   at `data/fixtures/quantiphy_submission_template.csv` with its SHA-256 in that folder's README.
+   3,289 rows; `id` is 1-based and contiguous, so **`id == parquet row index + 1`** — the guess in
+   the email was right. Every shared column matches `test_dataset.parquet` row-for-row with zero
+   mismatches. `scripts/make_submission.py` builds against it; `scripts/validate_submission.py`
+   diffs against it. Re-check the hash before any real submission — they have changed the linked
+   "template" once already.
+
+2. **No leaderboard "any time soon"; it appears "when the deadline approaches."**
+   `leaderboard.html`, `submit.html` and `upload.html` all still 404. The consequence matters more
+   than the fact: **there is no external feedback signal until roughly October.** So —
+   * `quantiphy/scoring.py` on the 159-row validation split is the *only* evidence we get, at
+     ±5.7 pt. Treat sub-6-point "improvements" as noise unless `paired_bootstrap` says otherwise.
+   * The 3-per-day submission quota is irrelevant for now; nothing is gained by rationing.
+   * The upload path stays untested until crunch time. Mitigated by building and freezing the
+     submission writer now, so only one column is left to fill at the deadline.
+
+**Still unanswered** (parked until ~September, none of it blocking): which deadline is
+authoritative, fine-tuning / external data / ensemble rules, whether gated weights count as
+open-weight, and team eligibility across tracks. Draft is still in `ORGANIZER-EMAIL.md`.
 
 ## Next actions, in order
 

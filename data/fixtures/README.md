@@ -8,17 +8,49 @@ under their original licences, with attribution to the QuantiPhy authors (Stanfo
 | `gpt-5.1_validation.csv` | [`Paulineli/QuantiPhy`](https://github.com/Paulineli/QuantiPhy) `model_outputs/gpt-5.1.csv` | MIT |
 | `published_results.csv` | same repo, `mra_results/all_model_results.csv` | MIT |
 | `test_dataset.parquet` | [`PaulineLi/QuantiPhy`](https://huggingface.co/datasets/PaulineLi/QuantiPhy) | CC-BY-4.0 |
+| `quantiphy_submission_template.csv` | `quantiphy.stanford.edu/competition/eval/` | CC-BY-4.0 |
 
 `test_dataset.parquet` holds **question metadata only** — the answer column is withheld by the
 organizers and is not present here.
 
-These pin two things we rely on:
+## The submission template is the contract
+
+Retrieved **2026-08-02**, 739,113 bytes,
+SHA-256 `1d46a24a3c97723f24ac5051282f67e915a75f16214c8f3ff5a0b4d7bd23a93b`.
+
+This replaces the `model_outputs/gpt-5.1.csv` the competition page used to link, which was a
+*validation* output (159 rows, with a `ground_truth_posterior` column) and not a submission format
+at all. The organizers posted this after we asked, on 2026-08-02.
+
+Verified, not assumed — `tests/test_submission.py` re-checks all of it:
+
+* 3,289 rows; `id` is **1-based, contiguous and ascending**, so `id == parquet row index + 1`.
+* Every shared column matches `test_dataset.parquet` **row-for-row with zero mismatches**;
+  `ground_truth_prior` is identical to the parquet's `prior`.
+* `parsed_value` is empty in all 3,289 rows.
+
+Pin it, because they have already changed the linked "template" once. Re-check with:
+
+```bash
+py -3.12 -c "
+import hashlib, urllib.request
+url='https://quantiphy.stanford.edu/competition/eval/quantiphy_submission_template.csv'
+print(hashlib.sha256(urllib.request.urlopen(url, timeout=120).read()).hexdigest())
+"
+```
+
+A different hash means the contract moved — diff it before trusting any existing submission.
+
+These pin three things we rely on:
 
 * `gpt-5.1_validation.csv` + `published_results.csv` let `tests/test_scoring.py` prove our scorer
   reproduces the organizers' published macro MRA of 0.4856. Without that anchor, every measured
   improvement is unverifiable.
 * `test_dataset.parquet` lets `tests/test_solver_core.py` assert parser coverage across all 3,289
   real test rows, so a parsing regression fails locally rather than silently costing points.
+* `quantiphy_submission_template.csv` is what `scripts/make_submission.py` fills and what
+  `scripts/validate_submission.py` compares against row-for-row. There is no server-side dry run,
+  so this local comparison is the only thing that catches a misaligned submission.
 
 Refresh with:
 

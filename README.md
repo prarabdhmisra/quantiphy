@@ -21,24 +21,34 @@ multiplied by 1000. A tool-based measurement pipeline is the open lane.
 
 - [x] Scoring harness, validated against the organizers' published baseline
 - [x] Submission pre-flight validator
-- [ ] Register team; email organizers (`ORGANIZER-EMAIL.md`) — **blocker**
-- [ ] Pull test videos; VLM control arm
-- [ ] Geometric solver (2D → 3D)
+- [x] Team registered (Vector Syndicate); submission format confirmed against the official template
+- [x] Geometric solver (2D → 3D) — **verified on synthetic fixtures only**
+- [ ] Run the solver on real video
 - [ ] Fusion + blowup detector
 
 ## Layout
 
     quantiphy/scoring.py           MRA metric + paired bootstrap
+    scripts/make_submission.py     fills the official template from a solver run
     scripts/validate_submission.py pre-flight check before spending daily quota
     tests/test_scoring.py          anchors the scorer to published numbers
-    data/fixtures/                 GPT-5.1 validation outputs, published results
+    tests/test_submission.py       anchors the submission to the official template
+    data/fixtures/                 GPT-5.1 validation outputs, official template, published results
 
 ## Usage
 
 ```bash
-py -3.12 -m pytest tests/ -q                                    # 21 tests
-py -3.12 scripts/validate_submission.py sub.csv --expect-rows 3289
+py -3.12 -m pytest tests/ -q                                    # 94 tests
+
+# Turn a solver run into a submission, then check it before spending a daily slot.
+py -3.12 scripts/make_submission.py predictions.csv --out sub.csv
+py -3.12 scripts/validate_submission.py sub.csv
 ```
+
+`id` in the official template is the `test_dataset.parquet` row index plus one — confirmed
+column-by-column against the organizers' file, not assumed. `make_submission.py` joins on it and
+copies every other column through untouched, so a reordered or partially-joined submission is
+caught locally rather than scoring near zero on the server.
 
 ```python
 from quantiphy.scoring import score, category_labels, paired_bootstrap
