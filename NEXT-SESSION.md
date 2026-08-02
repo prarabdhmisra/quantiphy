@@ -13,6 +13,20 @@ Last worked: **2026-08-02**. Nothing is in flight — no running jobs, no uncomm
 > Start there — diagnose the bias before adding any new component. Don't re-derive anything in
 > "Do not re-derive"; it cost real money. Ask me before spending more than ~$20 in a session.
 
+## Pending — nothing here is started
+
+| # | Item | Cost | Blocked by |
+|---|---|---|---|
+| 1 | Full 159-row validation run on `l4x1` | ~1–3 h, $5–15 GPU | nothing — needs my go-ahead on spend |
+| 2 | Diagnose the 2.4× undershoot (see "Next actions") | free, local | needs (1) to confirm the bias is real |
+| 3 | `parse_prior` fix for the `name ~ value unit` form | free, ~30 min | nothing. Worth ~0 points — hygiene only |
+| 4 | Fallback arm (VLM estimate), fused in log space | ~$5 GPU | nothing |
+| 5 | SAM2 masks for extent; CoTracker3 for weak fits | ~$10 GPU | best done after (2) says where the error is |
+| 6 | Follow-up email: 4 unanswered questions | free | parked by choice until ~September |
+| 7 | Measure `--shrink` on fallback rows | free once (1) exists | needs (1) |
+
+Nothing is half-finished and no branch is open. Any of these can be picked up cold.
+
 ## Smoke test, 2026-08-02 — first contact with real video
 
 `LIMIT=20` on validation, `l4x1`, job `6a6fcdff…`. Solved **13/20**. Measured, not estimated:
@@ -164,6 +178,8 @@ how far. Leave it at 1.0 until it is tested with `paired_bootstrap`.
 * `README.md` publicly documents the competitive analysis above. Trim it into a gitignored
   `NOTES.md` if that becomes a concern.
 * Session of 2026-08-01 cost ~$100, mostly research. Set a budget next time.
-* Session of 2026-08-02: submission plumbing plus three `l4x1` smoke runs, well under $5 of GPU.
+* Session of 2026-08-02: ~$37 of Claude time, plus three `l4x1` smoke runs (well under $5 of GPU).
   Job artifacts land in `prarabdhmisra/quantiphy-runs` (dataset repo, private) — the detection
   cache there is warm for the first 20 validation rows, so re-running them is free and instant.
+  Two of the three runs were spent on bugs, not results: `uv run` environments ship no `pip`, and
+  a `LIMIT` run that misses a category used to crash rather than report. Both are fixed.
