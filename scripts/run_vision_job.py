@@ -248,15 +248,23 @@ def main() -> int:
 
     # Scoring only means something where ground truth exists.
     if split == "validation":
-        from quantiphy.scoring import score
+        from quantiphy.scoring import CATEGORIES, category_labels, score
         merged = frame.reset_index(drop=True).copy()
         merged["parsed_value"] = results["parsed_value"].to_numpy()
-        try:
-            log(f"coverage-limited: {score(merged[merged.parsed_value.notna()])}")
-        except ValueError as error:
-            log(f"coverage-limited: not scorable — {error}")
-        merged["parsed_value"] = merged["parsed_value"].fillna(0.0)
-        log(f"as-submitted (unsolved=0): {score(merged)}")
+
+        # A LIMIT run takes the first N rows, which need not touch all four categories -- the
+        # scorer then correctly refuses to report a partial average. That is a property of the
+        # sample, not a failure of the run, so report it and still exit 0.
+        present = set(category_labels(merged))
+        if missing_categories := [name for name in CATEGORIES if name not in present]:
+            log(f"note: this sample has no {missing_categories} rows, so no macro average exists")
+
+        for label, predictions in (("coverage-limited", merged[merged.parsed_value.notna()]),
+                                   ("as-submitted (unsolved=0)", merged.fillna({"parsed_value": 0.0}))):
+            try:
+                log(f"{label}: {score(predictions)}")
+            except ValueError as error:
+                log(f"{label}: not scorable — {error}")
         log("GPT-5.1 reference on this split: macro 0.4856")
     return 0
 
