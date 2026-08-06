@@ -47,11 +47,20 @@ class DetectionSeries:
     width: np.ndarray          # bbox width, pixels
     height: np.ndarray         # bbox height, pixels
     scores: np.ndarray
-    frames_total: int
+    frames_total: int           # frames in the clip
+    frames_sampled: int = 0     # frames we actually ran the detector on
 
     @property
     def detection_rate(self) -> float:
-        return len(self.times) / self.frames_total if self.frames_total else 0.0
+        """Share of the frames we *looked at* that produced a detection.
+
+        Deliberately not a share of the clip: with ``max_frames`` capped at 48, dividing by a
+        428-frame clip pinned confidence at 0.112 no matter how clean the detections were, so
+        confidence tracked video duration instead of detection quality. Defaults to
+        ``frames_total`` so caches pickled before this field existed still load.
+        """
+        denominator = self.frames_sampled or self.frames_total
+        return len(self.times) / denominator if denominator else 0.0
 
     @property
     def mean_score(self) -> float:
@@ -77,6 +86,8 @@ def extent_for(series: DetectionSeries, measurement: str) -> float | None:
         return (width + height) / 2.0          # round objects: average the two axes
     if measurement == "radius":
         return (width + height) / 4.0
+    if measurement in {"calibre", "caliber"}:
+        return min(width, height)              # a bore, not a length: the small axis
     if measurement in {"length", "size"}:
         return max(width, height)
     return max(width, height)
@@ -237,6 +248,7 @@ class GroundingDinoBackend:
             times=array[:, 0], cx=array[:, 1], cy=array[:, 2],
             width=array[:, 3], height=array[:, 4], scores=array[:, 5],
             frames_total=max(total, len(frames)),
+            frames_sampled=len(frames),
         )
         self._cache[key] = series
         return series

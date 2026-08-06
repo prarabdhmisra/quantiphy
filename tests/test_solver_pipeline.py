@@ -21,7 +21,8 @@ from quantiphy.solver import solve_row
 from quantiphy.vision import NullBackend, PixelMeasurement, VisionBackend
 
 
-def make_series(times, cx, cy, width=20.0, height=10.0, score=0.9) -> DetectionSeries:
+def make_series(times, cx, cy, width=20.0, height=10.0, score=0.9,
+                frames_total=None, frames_sampled=None) -> DetectionSeries:
     times = np.asarray(times, dtype=float)
     return DetectionSeries(
         times=times,
@@ -30,7 +31,8 @@ def make_series(times, cx, cy, width=20.0, height=10.0, score=0.9) -> DetectionS
         width=np.full(times.shape, width),
         height=np.full(times.shape, height),
         scores=np.full(times.shape, score),
-        frames_total=len(times),
+        frames_total=len(times) if frames_total is None else frames_total,
+        frames_sampled=len(times) if frames_sampled is None else frames_sampled,
     )
 
 
@@ -72,6 +74,28 @@ def test_extent_uses_median_so_a_bad_frame_is_ignored() -> None:
     series = make_series([0, 0.1, 0.2, 0.3, 0.4], [0] * 5, [0] * 5)
     series.width[2] = 500.0                      # one frame snapped to the wrong object
     assert extent_for(series, "width") == pytest.approx(20.0)
+
+
+def test_calibre_is_the_small_axis_not_the_large_one() -> None:
+    """A calibre is a bore, not a length. Falling through to max() measured the whole ruler."""
+    series = make_series([0, 0.1, 0.2], [0] * 3, [0] * 3, width=500.0, height=12.0)
+    assert extent_for(series, "calibre") == pytest.approx(12.0)
+    assert extent_for(series, "caliber") == pytest.approx(12.0)
+
+
+def test_detection_rate_measures_hit_rate_not_clip_length() -> None:
+    """It divides by the frames we actually looked at, not by the whole clip.
+
+    With ``max_frames=48`` the old form capped a 428-frame clip's confidence at 0.112, so
+    confidence tracked video duration rather than detection quality -- useless for gating.
+    """
+    hit_every_sampled_frame = make_series(np.linspace(0, 2, 48), [0] * 48, [0] * 48,
+                                          frames_total=428, frames_sampled=48)
+    assert hit_every_sampled_frame.detection_rate == pytest.approx(1.0)
+
+    missed_half = make_series(np.linspace(0, 2, 24), [0] * 24, [0] * 24,
+                              frames_total=428, frames_sampled=48)
+    assert missed_half.detection_rate == pytest.approx(0.5)
 
 
 # ------------------------------------------------------------------ kinematics
@@ -182,6 +206,30 @@ def test_gravity_only_prior_cannot_scale_a_length_question() -> None:
     request = build_request(row(prior="gravity acc = 9.8m/s^2"))
     answer = solve_row(request, FakeBackend({}), "clip.mp4")
     assert not answer.solved and "gravity" in answer.reason
+
+
+def test_prior_naming_no_object_declines_instead_of_grounding_a_constant() -> None:
+    """``acceleration = 9.8 m/s^2`` -- 40 test rows. There is nothing in frame to measure.
+
+    The old path grounded an object literally called "acceleration" and scaled the answer off
+    whatever box came back. Declining sends the row to the fallback, which is strictly better.
+    """
+    request = build_request(row(prior="acceleration = 9.8 m/s^2"))
+    answer = solve_row(request, FakeBackend({}), "clip.mp4")
+    assert not answer.solved and "no groundable object" in answer.reason
+
+
+def test_target_falling_back_to_the_prior_object_is_marked_in_the_method() -> None:
+    """When the question yields no target phrase we reuse the prior's, which makes different
+    questions collapse onto one answer. Still emit it -- a blank scores zero -- but say so."""
+    request = build_request(row(question="How wide is it, in cm?"))
+    assert request.target_object is None
+    backend = FakeBackend({
+        "tennis ball": PixelMeasurement("tennis ball", extent_px=40.0, confidence=0.9),
+    })
+    answer = solve_row(request, backend, "clip.mp4")
+    assert answer.solved
+    assert "target-from-prior" in answer.method
 
 
 def test_unmeasurable_target_fails_softly_with_a_reason() -> None:

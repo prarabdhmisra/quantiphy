@@ -46,6 +46,19 @@ _PRIOR_KEYWORDS: tuple[tuple[str, Dimension], ...] = (
     (r"diameter|radius|length|width|height|calibre|caliber|size|distance", "length"),
 )
 
+#: Words naming a *quantity* rather than a thing. They must never survive into the object phrase:
+#: that phrase is handed to a grounding model verbatim, and asking it for "billiard ball diameter"
+#: returns a box round the wrong, larger region. Because the prior sets ``gamma``, that error is
+#: multiplicative on every answer in the row.
+_QUANTITY_WORDS = re.compile(
+    r"\b(speeds?|velocit\w*|acceler\w*|acc|gravity|diameters?|radius|lengths?|widths?|"
+    r"heights?|calibre|caliber|sizes?|distances?)\b", re.IGNORECASE
+)
+
+#: A bare ``t=0.6,`` prefix on a prior clause -- the instant the prior applies to. Distinct from
+#: ``_TIME_AT`` below, which needs the word "at". 124 test rows use this form.
+_PRIOR_TIME_PREFIX = re.compile(r"^\s*t\s*=\s*(\d+(?:\.\d+)?)\s*s?\s*[,;]?\s*", re.IGNORECASE)
+
 _TIME_AT = re.compile(r"\bat\s+(?:t\s*=\s*)?(\d+(?:\.\d+)?)\s*s\b", re.IGNORECASE)
 _TIME_BETWEEN = re.compile(
     r"between\s+(\d+(?:\.\d+)?)\s*s?\s+and\s+(\d+(?:\.\d+)?)\s*s\b", re.IGNORECASE
@@ -121,12 +134,28 @@ class SolveRequest:
 def _strip_object(text: str) -> str:
     """Tidy an extracted object phrase into something a grounding model can consume."""
     cleaned = re.sub(r"\(.*?\)", " ", text)
-    cleaned = re.sub(r"\b(at|after|between|from|in|on|when|during)\b.*$", " ", cleaned,
+    cleaned = re.sub(r"\b(at|after|before|between|from|in|on|when|during)\b.*$", " ", cleaned,
                      flags=re.IGNORECASE)
     cleaned = cleaned.replace("’s", "").replace("'s", "")
     cleaned = re.sub(r"^\s*(the|a|an)\s+", "", cleaned.strip(), flags=re.IGNORECASE)
     cleaned = re.sub(r"[\s,]+", " ", cleaned).strip(" ,.?？")
     return cleaned
+
+
+def _prior_object(label: str) -> str:
+    """The object phrase to hand a grounding model, from a prior's left-hand side.
+
+    Both spellings in the data reduce to the same thing: ``diameter of the tennis ball`` and
+    ``billiard ball diameter`` must both yield the bare noun phrase.
+
+    Returns ``""`` when the prior states a constant with nothing in frame to measure
+    (``acceleration = 9.8 m/s^2``, 40 test rows). An empty phrase is the honest answer there, and
+    strictly better than a plausible-looking one: the solver declines and falls back, instead of
+    grounding the word "acceleration" and scaling the whole row off whatever box comes back.
+    """
+    after = re.search(r"\b(?:of|for)\b(.*)$", label, re.IGNORECASE)
+    text = (after.group(1) if after else label).replace("_", " ")
+    return _strip_object(_QUANTITY_WORDS.sub(" ", text))
 
 
 def parse_output_unit(question: str) -> str | None:
@@ -146,10 +175,19 @@ def parse_prior(text: str) -> tuple[Prior, ...]:
 
     parsed: list[Prior] = []
     for line in re.split(r"[\n;]+", str(text)):
-        if "=" not in line:
+        # "=" everywhere in the test split, but validation also writes "speed ~1.1 m/s".
+        cut = max(line.rfind("="), line.rfind("~"))
+        if cut < 0:
             continue
-        left, _, right = line.rpartition("=")
-        label = left.strip().lower()
+        label, right = line[:cut].strip().lower(), line[cut + 1:]
+
+        # A leading "t=0.6," names the instant the prior holds at. Take it off the label before
+        # anything else reads it, or it ends up glued to the object phrase.
+        timestamp = None
+        prefix = _PRIOR_TIME_PREFIX.match(label)
+        if prefix:
+            timestamp = float(prefix.group(1))
+            label = label[prefix.end():]
 
         dimension: Dimension | None = None
         quantity = "unknown"
@@ -175,19 +213,13 @@ def parse_prior(text: str) -> tuple[Prior, ...]:
                 continue
             value, unit = quantified
 
-        timestamp = None
-        time_match = _TIME_AT.search(label) or _TIME_AFTER.search(label)
-        if time_match:
-            timestamp = float(time_match.group(1))
-
-        object_name = _strip_object(re.sub(r"^.*?\b(?:of|for)\b", "", label) or label)
-        if not object_name:
-            object_name = _strip_object(re.sub(r"\b(speed|velocity|acceleration|diameter|radius|"
-                                               r"length|width|height|calibre|caliber)\b", " ",
-                                               label))
+        if timestamp is None:
+            time_match = _TIME_AT.search(label) or _TIME_AFTER.search(label)
+            if time_match:
+                timestamp = float(time_match.group(1))
 
         parsed.append(Prior(
-            object_name=object_name,
+            object_name=_prior_object(label),
             quantity="gravity" if "gravity" in label else quantity,
             dimension=dimension,
             value_si=to_si(value, unit),

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -84,6 +85,65 @@ def test_prior_keeps_negative_acceleration_magnitude() -> None:
     assert prior.value_si == pytest.approx(-2.86)
 
 
+@pytest.mark.parametrize("text, expected_object", [
+    # The phrase is fed straight to Grounding-DINO, so the quantity word must not survive:
+    # asking it to find "billiard ball diameter" returns a box round the wrong, larger thing,
+    # which makes gamma too small and shrinks every downstream answer.
+    ("billiard ball diameter = 57.2mm", "billiard ball"),
+    ("walking velocity = 1.25m/s", "walking"),
+    ("lane width = 3.66m", "lane"),
+    ("center circle radius = 9.15m", "center circle"),
+    ("credit card width = 5.4cm", "credit card"),
+    ("ruler calibre = 1cm", "ruler"),
+    ("sailboat length = 12m", "sailboat"),
+    # ...while the already-clean "<quantity> of the <object>" form must be left alone.
+    ("diameter of the tennis ball = 6.7cm", "tennis ball"),
+    ("acceleration of the typewriter before 0.45s = 9.8m/s^2", "typewriter"),
+    ("diameter of the tire of the blue car = 40cm", "tire of the blue car"),
+])
+def test_prior_object_phrase_is_groundable(text: str, expected_object: str) -> None:
+    (prior,) = parse_prior(text)
+    assert prior.object_name == expected_object
+
+
+def test_prior_recovers_a_leading_timestamp_instead_of_burying_it_in_the_phrase() -> None:
+    """124 test rows are written ``t=0.6, ball acceleration = ...``.
+
+    The timestamp was silently dropped and the ``t=0.6`` glued onto the object phrase, so the
+    prior was measured at the wrong instant from a phrase nothing can ground.
+    """
+    (prior,) = parse_prior("t=0.6, ball acceleration = 4.6m/s^2")
+    assert prior.object_name == "ball"
+    assert prior.timestamp == pytest.approx(0.6)
+    assert prior.value_si == pytest.approx(4.6)
+
+    (with_unit,) = parse_prior("t=1.6s, ball acceleration = 3.0m/s^2")
+    assert with_unit.timestamp == pytest.approx(1.6)
+
+
+def test_prior_accepts_a_tilde_in_place_of_equals() -> None:
+    """``pedestrian walking speed ~1.1 m/s`` -- 0 test rows, but 6 of the first 20 validation."""
+    (prior,) = parse_prior("pedestrian walking speed ~1.1 m/s")
+    assert prior.dimension == "speed"
+    assert prior.value_si == pytest.approx(1.1)
+    assert prior.object_name == "pedestrian walking"
+
+
+@pytest.mark.parametrize("text", [
+    "acceleration = 9.8 m/s^2",
+    "gravity acc = 9.8m/s^2",
+    "gravity_acceleration = 9.8m/s^2",
+])
+def test_a_bare_constant_prior_names_no_object_to_ground(text: str) -> None:
+    """A physical constant is not a scene measurement: there is nothing in frame to measure.
+
+    Leaving a phrase here is worse than leaving none -- the solver would ground an object called
+    "acceleration" and scale the whole answer off it.
+    """
+    (prior,) = parse_prior(text)
+    assert prior.object_name == ""
+
+
 def test_gravity_prior_is_flagged_and_deprioritised_as_scale_anchor() -> None:
     """Gravity is a constant, not a scene measurement, so it cannot set pixel scale."""
     request = build_request({
@@ -162,6 +222,33 @@ def test_parser_coverage_on_full_test_split(test_split: pd.DataFrame) -> None:
 
     # Every row must yield a usable unit, or we would submit a blank and score zero.
     assert all(r.output_unit and units.lookup(r.output_unit) for r in requests)
+
+
+def test_no_scale_prior_phrase_is_contaminated_on_the_full_test_split(
+        test_split: pd.DataFrame) -> None:
+    """The assertion that actually proves the grounding fix, at 3,289-row scale.
+
+    Before the fix, 412 rows handed Grounding-DINO a phrase containing the quantity word
+    ("billiard ball diameter") and 124 handed it a ``t=0.6`` prefix. Both make the detector return
+    a box round the wrong thing, and because the prior sets ``gamma`` the error is multiplicative
+    on every answer in the row. Zero is the only acceptable count.
+    """
+    quantity_word = re.compile(
+        r"\b(speeds?|velocit\w*|acceler\w*|acc|gravity|diameters?|radius|lengths?|widths?|"
+        r"heights?|calibre|caliber|sizes?|distances?)\b", re.IGNORECASE)
+
+    contaminated, groundable = [], 0
+    for _, row in test_split.iterrows():
+        prior = build_request(row).scale_prior
+        if prior is None or not prior.object_name:
+            continue                       # a constant with no object is handled by the solver
+        groundable += 1
+        if quantity_word.search(prior.object_name) or prior.object_name.startswith("t="):
+            contaminated.append((str(row["prior"])[:60], prior.object_name))
+
+    assert contaminated == []
+    # Guard the other way too: over-stripping would empty phrases and silently lose rows.
+    assert groundable > 0.88 * len(test_split)
 
 
 # --------------------------------------------------------------------------- geometry

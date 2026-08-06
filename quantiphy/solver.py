@@ -65,6 +65,10 @@ def solve_row(request: SolveRequest, backend: VisionBackend, video_path: str,
         return Answer(None, unit, reason="no usable scale prior")
     if prior_measurement is None:
         return Answer(None, unit, reason="gravity prior cannot set pixel scale")
+    if not prior.object_name:
+        # A constant with no object in frame ("acceleration = 9.8 m/s^2"). Nothing to measure, so
+        # nothing can set the scale -- decline and let the fallback fill it.
+        return Answer(None, unit, reason="prior names no groundable object")
 
     prior_pixels = prior_measurement.value_for(prior.dimension)
     if not prior_pixels:
@@ -105,6 +109,11 @@ def solve_row(request: SolveRequest, backend: VisionBackend, video_path: str,
     method = "geometric-3d" if use_depth else "geometric-2d"
     if radial:
         method += "+radial"
+    if not request.target_object:
+        # We measured the prior's object for want of a target phrase, so every question about this
+        # video collapses onto one answer. Still emit it -- a blank scores a hard zero -- but leave
+        # a mark, or a collapsed row is indistinguishable from a real solve in the output.
+        method += "+target-from-prior"
 
     return Answer(
         value=from_si(value_si, unit),

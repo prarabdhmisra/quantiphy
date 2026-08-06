@@ -41,6 +41,8 @@ Environment:
     QUANTIPHY_HF_REPO dataset repo holding the package source, if not using git
     OUTPUT_REPO       dataset repo to push predictions and the detection cache to (required)
     SPLIT             "validation" (159 rows, has ground truth) or "test" (3,289 rows)
+    RUN_NAME          output folder, default "<split>-grounding". Change it whenever solver
+                      behaviour changes, or the checkpoint will resume and replay stale answers.
     LIMIT             optional row cap, for a smoke test
     BOX_THRESHOLD     detection threshold, default 0.25
     MAX_FRAMES        frames sampled per clip, default 48
@@ -186,7 +188,10 @@ def main() -> int:
         frame = frame.head(int(limit)).copy()
         log(f"LIMIT set: solving only {len(frame)} rows")
 
-    name = f"{split}-grounding"
+    # Checkpoints resume by row index, so a re-run against the same name replays the previous
+    # answers and silently measures nothing. Anything that changes solver behaviour needs its own
+    # RUN_NAME -- which also keeps the earlier run's results around to compare against.
+    name = os.environ.get("RUN_NAME") or f"{split}-grounding"
     done, cache_path = load_checkpoint(output_repo, name)
 
     backend = GroundingDinoBackend(
