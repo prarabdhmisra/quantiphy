@@ -12,33 +12,49 @@ Last worked: **2026-08-05**. Branch `fix/prior-grounding-phrase` is pushed and g
 > Don't re-derive anything in "Do not re-derive"; it cost real money. Ask me before spending more
 > than ~$20 in a session.
 
-## What the undershoot actually was
+## The undershoot is NOT one bug — read this before believing any single-cause story
 
-**Not** boxes overestimating non-rectangular objects (the SAM2 hypothesis this file used to carry).
-It was `parse_prior` handing the grounding model a phrase containing the quantity word.
+Two hypotheses have now been tested and **both are wrong**:
 
-Grounding-DINO was being asked to detect **"billiard ball diameter"** and **"walking velocity"**
-instead of "billiard ball" and the walking person. It returns its best box for a loosely related,
-larger region, so `gamma = prior_world / prior_pixels` comes out too small — and because the prior
-sets the scale, **every** answer in the row shrinks by the same factor. That is exactly the uniform
-multiplicative signature we measured.
+1. *Boxes overestimate non-rectangular objects* (the old SAM2 story). No — `'billiard ball'` is
+   detected as a clean, tight, stable box: 56.5 x 59.1 px, score 0.661, detection rate 1.00, width
+   spread only 51–58 px across frames. 57.2 mm over 57.8 px is **0.990 mm/px**, and that scale is
+   right.
+2. *The prior's grounding phrase contains the quantity word* (tested 2026-08-05, measured, wrong).
+   The phrase defect is real — 412 test rows — but Grounding-DINO turned out to be robust to it.
+   Stripping it moved `prior_pixels` from 55.5 to 57.8 px on the billiard rows and 53.1 to 54.4 on
+   the walking rows. **The bias did not move: median pred/truth 0.419 -> 0.403.**
 
-The old code did have a fallback that stripped quantity words, but it only ran `if not object_name`,
-and the `of|for` regex always returned a non-empty *wrong* string, so it never fired.
+The "uniform 2.4x multiplicative undershoot" was an **artifact of averaging across question types**.
+Split by what the question asks for, the 19 solved rows look nothing like a single bias:
 
-This was found for **zero GPU spend**, by replaying the 20-row smoke run's cached detections
-offline. The decomposition:
+| measurement | n | median ratio | ratios |
+|---|---|---|---|
+| **distance** | 4 | **0.226** | 0.06 0.14 0.31 0.40 — *every one undershoots* |
+| velocity | 6 | **0.094** | 0.00 0.03 0.09 0.10 0.74 1.54 |
+| **width** | 2 | **7.409** | 7.14 7.68 — *overshoot, which is fatal* |
+| length | 3 | 1.708 | 0.21 1.71 9.51 |
+| height / size / diameter / accel | 4 | ~0.7 | 1.01 1.09 0.37 0.44 |
+
+Excluding `distance` rows the median is **0.736 with 7 of 15 overshooting** — not an undershoot at
+all. There is no global correction factor to find here, and fitting one would be fitting noise.
+
+### The one clean, verified bug: "distance between A and B"
+
+`_TARGET_KEYWORDS` maps `distance` to measurement `"distance"`, and `extent_for()` has no branch for
+it, so it falls through to `max(width, height)` — **one object's own box size, where a separation
+between two objects was asked for.**
+
+Verified numerically on the billiard rows, where the prior's scale is known good at 0.990 mm/px:
 
 ```
- #   ratio  prior_px  needed  prior phrase              -> target phrase
- 0   0.099     501.2    49.7  'ruler calibre'           -> 'wood block'
-14   0.419      55.5    23.3  'billiard ball diameter'  -> 'balck ball'
-16   0.766      55.5    42.5  'billiard ball diameter'  -> 'orange ball'
- 4   0.143      53.1     7.6  'walking velocity'        -> 'two black road signs'
+row 14  truth 14.74 cm  needs 148.9 px of separation   we measured 59.9 px (one ball's box)
+row 17  truth 18.04 cm  needs 182.3 px of separation   we measured 57.0 px (one ball's box)
 ```
 
-`prior_pixels` would have to be **0.42x** what we measured for the answers to land. The error is
-entirely in the prior's pixel measurement.
+**203 of 3,289 test rows (6.2%) ask "distance between A and B"**, plus 75 more asking for a distance
+some other way. All of them are currently measuring the wrong quantity. This needs two centroids,
+not one extent — and the detector already returns centroids, so it is a solver fix, not a vision one.
 
 ### Counted over all 3,289 real test rows — these are the numbers that justify the fix
 
@@ -87,15 +103,18 @@ need a fresh detection pass — which for the smoke set is 4 videos and a few ce
 
 ## Pending
 
-| # | Item | Cost | Notes |
-|---|---|---|---|
-| 1 | Merge `fix/prior-grounding-phrase` once the confirm run is read | free | see "Confirmation run" below |
-| 2 | Full 159-row validation run on `l4x1` | ~1–3 h, $5–15 | **now worth doing** — do it on the fixed solver, not before |
-| 3 | Fallback arm (VLM estimate), fused in log space | ~$5 GPU | more urgent than it was: 325 test rows now land here by design |
-| 4 | Better phrase for bare gerunds — `walking speed` strips to `'walking'` (17 test rows) | free | measure before bothering; "walking" may ground the walker fine |
-| 5 | SAM2 masks / CoTracker3 | ~$10 GPU | **deprioritised** — the evidence says phrase, not box shape. Re-evaluate after (2) |
-| 6 | Follow-up email: 4 unanswered questions | free | parked by choice until ~September |
-| 7 | Measure `--shrink` | free once (2) exists | needs (2) |
+In priority order, by measured evidence rather than by hunch:
+
+| # | Item | Rows | Cost | Notes |
+|---|---|---|---|---|
+| 1 | **"distance between A and B" must use two centroids, not one box extent** | **278** | free | The only cleanly verified bug left. Needs a second target phrase out of `parse_question`, then a centroid separation in `grounding.py`. Start here. |
+| 2 | **Diagnose the velocity rows** — median ratio 0.094, four of six near zero | ~1,000 | free | Biggest category and the worst performing. Replay the cache; the quadratic fit or the `fps`/timestamp path is suspect. No GPU needed. |
+| 3 | Kill the fatal overshoots: gate on prior confidence | — | free | The `pedestrian walking` prior scored 0.341 with box width jittering 13–59 px and produced 7x overshoots. `min_confidence` already exists and is unused (`solve_row` defaults it to 0.0). Now that `detection_rate` is fixed, confidence is finally meaningful. |
+| 4 | Decide on `fix/prior-grounding-phrase` | 412 | free | Real defects, 114 tests green, but it did **not** move the metric. Merge on correctness grounds, not on a score claim. |
+| 5 | Full 159-row validation run on `l4x1` | — | ~1–3 h, $5–15 | Only after 1–3. Running it now would measure known-broken behaviour. |
+| 6 | Fallback arm (VLM estimate), fused in log space | 325 | ~$5 GPU | More urgent than before: 325 rows now decline by design. |
+| 7 | SAM2 masks / CoTracker3 | — | ~$10 GPU | **Deprioritised twice over.** The billiard box is already tight and correct; masks would not have helped. |
+| 8 | Follow-up email; `--shrink` measurement | — | free | Parked / needs (5). |
 
 ## Confirmation run — 2026-08-05
 
@@ -106,8 +125,23 @@ branch `fix/prior-grounding-phrase`. Cold cache: all four prior phrases changed.
 and solved rises above 13/20 (the `~` fix alone should add up to 6). If it does not move, the phrase
 hypothesis is wrong — stop and re-plan rather than pushing on.
 
-> Result: see the session notes below / re-read with
-> `py -3.12 scripts/replay_cache.py --run validation-grounding-fix1`.
+**Result — half met, and the half that failed is the important one.**
+
+| | before | after |
+|---|---|---|
+| solved | 13/20 | **19/20** |
+| median pred/truth | 0.419 | **0.403** |
+| within 2x either way | 4/13 | 5/19 |
+| overshoots | 1/13 | **7/19** |
+
+Solved rose as predicted (the `~` fix, worth ~0 points on test — it buys measurement power, not
+score). **The bias did not move**, so the phrase hypothesis is refuted as the cause. The one unsolved
+row is the gravity prior, correctly declined.
+
+Note the overshoot count went 1/13 -> 7/19: the six rows the `~` fix unlocked include two 7x
+overshoots, which score exactly zero. Unlocking rows is not automatically progress.
+
+Re-read any run offline with `py -3.12 scripts/replay_cache.py --run <name>` — no GPU needed.
 
 ## Baseline to beat, and the caveat on the old number
 
@@ -201,5 +235,8 @@ tested with `paired_bootstrap`.
 * `README.md` publicly documents the competitive analysis. Trim it into a gitignored `NOTES.md` if
   that becomes a concern.
 * Session of 2026-08-01 cost ~$100, mostly research. 2026-08-02: ~$37 plus three `l4x1` smoke runs.
-* Session of 2026-08-05: diagnosis done entirely offline against the cached detections, then one
-  20-row confirm run. The lesson worth keeping: **the cache made a $5–15 blind run unnecessary.**
+* Session of 2026-08-05: ~$52 of Claude time plus one 7-minute `l4x1` run (cents). Two lessons worth
+  keeping. **The detection cache makes solver-logic questions free** — replaying it beats paying for
+  a run. And **decompose by question type before believing a global bias**: "we undershoot 2.4x
+  uniformly" survived two sessions and dissolved the moment the 19 rows were split by measurement,
+  into a distance bug, collapsed velocities, and 7x overshoots pulling the other way.
