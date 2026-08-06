@@ -1,7 +1,16 @@
 # Resume here
 
-Last worked: **2026-08-05**. Branch `fix/prior-grounding-phrase` is pushed and green (114 tests);
-`main` is deliberately still at the last *measured* state.
+Last worked: **2026-08-05**.
+
+> **Where things live.** This document is on both branches and is accurate on both. The *code* from
+> 2026-08-05 is only on **`fix/prior-grounding-phrase`** (pushed, 114 tests green) — `main` is
+> deliberately still at the last *measured* state, 94 tests, because the fix did not move the metric
+> it was meant to move. Anything below that names `scripts/replay_cache.py` or 114 tests needs that
+> branch checked out:
+>
+> ```bash
+> git checkout fix/prior-grounding-phrase
+> ```
 
 ## Paste this to start the next session
 
@@ -161,15 +170,16 @@ Re-read any run offline with `py -3.12 scripts/replay_cache.py --run <name>` —
 | | |
 |---|---|
 | Repo | https://github.com/prarabdhmisra/quantiphy (public, MIT) |
-| Tests | **114 passing** (`py -3.12 -m pytest tests/ -q`) |
+| Tests | **94 on `main`, 114 on the branch** (`py -3.12 -m pytest tests/ -q`) |
 | Plan | `~/.claude/plans/snappy-launching-candy.md` |
 | Track | **B (Open-Weight)** primary, A secondary |
 | Deadline | **Plan for Oct 1, 2026** (site advertises Nov 5, but its own timeline finalizes rankings mid-October) |
 
 **Built:** `scoring.py` (MRA + paired bootstrap), `units.py`, `parsing.py`, `geometry.py`,
 `vision.py` (backend Protocol), `backends/grounding.py` (Grounding-DINO), `solver.py`,
-`scripts/run_vision_job.py` (HF Jobs, checkpoints + resumes), `scripts/replay_cache.py`,
-`scripts/make_submission.py`, `scripts/validate_submission.py`, `notebooks/colab_vision.ipynb`.
+`scripts/run_vision_job.py` (HF Jobs, checkpoints + resumes), `scripts/make_submission.py`,
+`scripts/validate_submission.py`, `notebooks/colab_vision.ipynb`, plus
+`scripts/replay_cache.py` **on the branch only**.
 
 The HF Jobs path is proven end to end: install, video download, GPU detection, checkpoint, resume,
 scoring, exit 0.
