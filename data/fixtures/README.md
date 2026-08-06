@@ -18,6 +18,11 @@ organizers and is not present here.
 Retrieved **2026-08-02**, 739,113 bytes,
 SHA-256 `1d46a24a3c97723f24ac5051282f67e915a75f16214c8f3ff5a0b4d7bd23a93b`.
 
+**Re-verified 2026-08-05** after the organizers wrote that they had "updated the webpage with a new
+template": same hash, same 739,113 bytes, and both the template and `competition/index.html` still
+report `Last-Modified: Sun, 02 Aug 2026 13:29:16 GMT`. Their message refers to the update already
+pinned here. The contract has not moved.
+
 This replaces the `model_outputs/gpt-5.1.csv` the competition page used to link, which was a
 *validation* output (159 rows, with a `ground_truth_posterior` column) and not a submission format
 at all. The organizers posted this after we asked, on 2026-08-02.
