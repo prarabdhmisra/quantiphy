@@ -1,94 +1,150 @@
 # Resume here
 
-Last worked: **2026-08-02**. Nothing is in flight — no running jobs, no uncommitted work.
+Last worked: **2026-08-05**. Branch `fix/prior-grounding-phrase` is pushed and green (114 tests);
+`main` is deliberately still at the last *measured* state.
 
 ## Paste this to start the next session
 
 > Resuming the QuantiPhy Challenge (NeurIPS 2026) entry. Read
-> `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first — full state as of 2026-08-02, nothing in
-> flight. Repo is public at https://github.com/prarabdhmisra/quantiphy, 94 tests pass, the
-> submission format is settled, and the solver has now run on real video once (20 rows).
->
-> The headline problem is in "Smoke test" below: we **systematically undershoot by about 2.4×**.
-> Start there — diagnose the bias before adding any new component. Don't re-derive anything in
-> "Do not re-derive"; it cost real money. Ask me before spending more than ~$20 in a session.
+> `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
+> https://github.com/prarabdhmisra/quantiphy. The 2.4x undershoot is diagnosed and fixed on branch
+> `fix/prior-grounding-phrase` — read "What the undershoot actually was" before touching anything.
+> Don't re-derive anything in "Do not re-derive"; it cost real money. Ask me before spending more
+> than ~$20 in a session.
 
-## Pending — nothing here is started
+## What the undershoot actually was
 
-| # | Item | Cost | Blocked by |
+**Not** boxes overestimating non-rectangular objects (the SAM2 hypothesis this file used to carry).
+It was `parse_prior` handing the grounding model a phrase containing the quantity word.
+
+Grounding-DINO was being asked to detect **"billiard ball diameter"** and **"walking velocity"**
+instead of "billiard ball" and the walking person. It returns its best box for a loosely related,
+larger region, so `gamma = prior_world / prior_pixels` comes out too small — and because the prior
+sets the scale, **every** answer in the row shrinks by the same factor. That is exactly the uniform
+multiplicative signature we measured.
+
+The old code did have a fallback that stripped quantity words, but it only ran `if not object_name`,
+and the `of|for` regex always returned a non-empty *wrong* string, so it never fired.
+
+This was found for **zero GPU spend**, by replaying the 20-row smoke run's cached detections
+offline. The decomposition:
+
+```
+ #   ratio  prior_px  needed  prior phrase              -> target phrase
+ 0   0.099     501.2    49.7  'ruler calibre'           -> 'wood block'
+14   0.419      55.5    23.3  'billiard ball diameter'  -> 'balck ball'
+16   0.766      55.5    42.5  'billiard ball diameter'  -> 'orange ball'
+ 4   0.143      53.1     7.6  'walking velocity'        -> 'two black road signs'
+```
+
+`prior_pixels` would have to be **0.42x** what we measured for the answers to land. The error is
+entirely in the prior's pixel measurement.
+
+### Counted over all 3,289 real test rows — these are the numbers that justify the fix
+
+| Rows | Defect |
+|---|---|
+| **412** | prior phrase contained the quantity word |
+| **205** | `acceleration = 9.8 m/s^2` grounded an object literally called "acceleration" |
+| **124** | `t=0.6, ball acceleration` lost the timestamp *and* glued `t=0.6` onto the phrase |
+| 4 | `calibre` fell through to `max(w,h)` and measured the whole ruler |
+| 0 | zero-valued priors — checked and ruled out |
+
+`tests/test_no_scale_prior_phrase_is_contaminated_on_the_full_test_split` now asserts all of these
+are zero, offline, in ~2 s. That assertion, not the 20-row MRA, is the real evidence.
+
+## What changed on the branch
+
+* **`quantiphy/parsing.py`** — `_prior_object()` strips quantity words unconditionally; a leading
+  `t=0.6,` lifts into `timestamp`; `~` accepted as a separator alongside `=`. A prior naming no
+  object returns `""`.
+* **`quantiphy/solver.py`** — an empty prior phrase declines with "prior names no groundable
+  object" instead of scaling off a nonsense box. A row whose target phrase is missing gets
+  `+target-from-prior` on its method, so the collapse is visible in output.
+* **`quantiphy/backends/grounding.py`** — `detection_rate` divides by frames *sampled*, not clip
+  length (a 428-frame clip used to cap confidence at 0.112 no matter how clean the detections were);
+  `calibre`/`caliber` use the small axis.
+* **`scripts/replay_cache.py`** — new. The offline harness this diagnosis came from.
+* **`scripts/run_vision_job.py`** — `RUN_NAME` env var. Checkpoints resume by row index, so without
+  it a re-run replays stale answers and measures nothing.
+
+**Expect the solved count on test to drop.** 325 rows move from "confidently wrong" to "unsolved →
+fallback". That is the right side of a metric where overshoot is fatal, not a regression.
+
+## `scripts/replay_cache.py` — use this before spending anything
+
+```bash
+py -3.12 scripts/replay_cache.py [--limit 20] [--run validation-grounding]
+```
+
+Detection is the expensive part and it is already pushed to the Hub per run. Everything downstream
+is deterministic CPU code, so any parsing or geometry change can be measured against detections we
+have already paid for, in about two seconds.
+
+The one catch: detections are cached per `(video, phrase)`, so **a change that renames phrases shows
+up as cache misses, not new numbers**. That is correct and the script says so loudly. Those rows
+need a fresh detection pass — which for the smoke set is 4 videos and a few cents.
+
+## Pending
+
+| # | Item | Cost | Notes |
 |---|---|---|---|
-| 1 | Full 159-row validation run on `l4x1` | ~1–3 h, $5–15 GPU | nothing — needs my go-ahead on spend |
-| 2 | Diagnose the 2.4× undershoot (see "Next actions") | free, local | needs (1) to confirm the bias is real |
-| 3 | `parse_prior` fix for the `name ~ value unit` form | free, ~30 min | nothing. Worth ~0 points — hygiene only |
-| 4 | Fallback arm (VLM estimate), fused in log space | ~$5 GPU | nothing |
-| 5 | SAM2 masks for extent; CoTracker3 for weak fits | ~$10 GPU | best done after (2) says where the error is |
+| 1 | Merge `fix/prior-grounding-phrase` once the confirm run is read | free | see "Confirmation run" below |
+| 2 | Full 159-row validation run on `l4x1` | ~1–3 h, $5–15 | **now worth doing** — do it on the fixed solver, not before |
+| 3 | Fallback arm (VLM estimate), fused in log space | ~$5 GPU | more urgent than it was: 325 test rows now land here by design |
+| 4 | Better phrase for bare gerunds — `walking speed` strips to `'walking'` (17 test rows) | free | measure before bothering; "walking" may ground the walker fine |
+| 5 | SAM2 masks / CoTracker3 | ~$10 GPU | **deprioritised** — the evidence says phrase, not box shape. Re-evaluate after (2) |
 | 6 | Follow-up email: 4 unanswered questions | free | parked by choice until ~September |
-| 7 | Measure `--shrink` on fallback rows | free once (1) exists | needs (1) |
+| 7 | Measure `--shrink` | free once (2) exists | needs (2) |
 
-Nothing is half-finished and no branch is open. Any of these can be picked up cold.
+## Confirmation run — 2026-08-05
 
-## Smoke test, 2026-08-02 — first contact with real video
+Job `6a73ddeda00abefd4b294c9b`, `l4x1`, `LIMIT=20`, `RUN_NAME=validation-grounding-fix1`, against
+branch `fix/prior-grounding-phrase`. Cold cache: all four prior phrases changed.
 
-`LIMIT=20` on validation, `l4x1`, job `6a6fcdff…`. Solved **13/20**. Measured, not estimated:
+**Success criterion, fixed in advance:** median pred/truth moves from 0.419 materially toward 1.0
+and solved rises above 13/20 (the `~` fix alone should add up to 6). If it does not move, the phrase
+hypothesis is wrong — stop and re-plan rather than pushing on.
+
+> Result: see the session notes below / re-read with
+> `py -3.12 scripts/replay_cache.py --run validation-grounding-fix1`.
+
+## Baseline to beat, and the caveat on the old number
 
 | | |
 |---|---|
-| MRA over the 13 solved rows | **0.300** |
-| MRA as-submitted (unsolved → 0) | **0.195** |
-| GPT-5.1 on full validation | 0.4856 |
+| Smoke test 2026-08-02, 20 rows, pre-fix | 13/20 solved, MRA 0.300 over solved, **0.195** as-submitted |
+| Median pred/truth, pre-fix | 0.419 |
+| GPT-5.1 on full validation | **0.4856** |
+| Human average / top humans | 0.556 / 0.72 |
+| Best open-weight (Qwen3-VL-32B) | 46.0 |
 
-**Caveat: 20 rows, all S2/D2.** No macro average exists for this sample and the CI is enormous.
-These numbers rank as "the pipeline runs and is currently bad", nothing finer.
-
-What the 13 solved rows actually look like:
-
-* **Median pred/truth = 0.419.** We undershoot by ~2.4× and we do it *consistently* — only 1 of 13
-  overshoots, 4 of 13 land within 2×, 3 of 13 are off by more than 10×.
-* A uniform multiplicative undershoot is a **structural bug, not measurement noise**. The likely
-  mechanism: the box drawn round the *prior's* object overestimates its pixel extent, so
-  `gamma = prior_world / prior_pixels` comes out too small and every downstream answer shrinks by
-  the same factor. This is the SAM2-masks hypothesis, and it now has evidence behind it.
-* 2 of 13 rows returned identical predictions for different questions — grounding collapsing onto
-  one box. Real, but a smaller effect than the scale bias.
-
-The 7 unsolved rows are **not** a test-set problem:
-
-* 6 × "no usable scale prior" are all the same string, `pedestrian walking speed ~1.1 m/s`. The
-  parser wants `name = value unit`, and this has `~` and no `=`. **This form appears 0 times in the
-  3,289 test rows** — only 4 test priors fail to parse at all, all of them the typo
-  `lenth of the credit card = 8.56 cm`. So this failure inflates our apparent error rate on the
-  split we measure with, but would cost roughly nothing on test. Fix it for measurement hygiene,
-  not for score.
-* 1 × "gravity prior cannot set pixel scale" is the solver correctly declining a row it cannot
-  anchor. That one needs the fallback arm.
+**20 rows, all S2/D2.** No macro average exists for that sample and the CI is enormous. It ranks as
+"the pipeline runs", nothing finer.
 
 ## State
 
 | | |
 |---|---|
 | Repo | https://github.com/prarabdhmisra/quantiphy (public, MIT) |
-| Tests | 94 passing (`py -3.12 -m pytest tests/ -q`) |
-| Plan | `~/.claude/plans/inherited-doodling-sun.md` |
+| Tests | **114 passing** (`py -3.12 -m pytest tests/ -q`) |
+| Plan | `~/.claude/plans/snappy-launching-candy.md` |
 | Track | **B (Open-Weight)** primary, A secondary |
 | Deadline | **Plan for Oct 1, 2026** (site advertises Nov 5, but its own timeline finalizes rankings mid-October) |
-| Bar to beat | GPT-5.1 **0.4856** on validation; human avg 0.556, top humans 0.72; best open-weight (Qwen3-VL-32B) 46.0 |
 
 **Built:** `scoring.py` (MRA + paired bootstrap), `units.py`, `parsing.py`, `geometry.py`,
 `vision.py` (backend Protocol), `backends/grounding.py` (Grounding-DINO), `solver.py`,
-`scripts/run_vision_job.py` (HF Jobs, checkpoints + resumes), `scripts/make_submission.py`,
-`scripts/validate_submission.py`, `notebooks/colab_vision.ipynb`.
+`scripts/run_vision_job.py` (HF Jobs, checkpoints + resumes), `scripts/replay_cache.py`,
+`scripts/make_submission.py`, `scripts/validate_submission.py`, `notebooks/colab_vision.ipynb`.
 
-**Detection accuracy is now measured, on 20 rows only** — see "Smoke test" above. Everything
-beyond those 20 rows is still synthetic-fixture territory.
-
-The HF Jobs path is proven end to end: install, video download, GPU detection, checkpoint, resume
-(a warm re-run finished 20 rows in 18 s), scoring, exit 0.
+The HF Jobs path is proven end to end: install, video download, GPU detection, checkpoint, resume,
+scoring, exit 0.
 
 ## Do not re-derive — these are measured, and they cost real money
 
 * MRA thresholds are `{0.1..0.9, 0.95}` **per the code**. The paper's Appendix A.2 set
   `{0.5..0.95}` is a typo — it yields 0.376 against the published 0.486.
-* **Overshoot is fatal, undershoot is cheap.** `pred ≥ 1.9×` truth scores 0; `0.5×` still scores
+* **Overshoot is fatal, undershoot is cheap.** `pred >= 1.9x` truth scores 0; `0.5x` still scores
   0.4. 25% of GPT-5.1 rows score exactly 0 and **57% of those are overshoots** — the largest
   recoverable pool. Oracle fix = +19 pts; a realistic detector = +7.5 pts.
 * **Do not calibrate on the 159-row validation set.** Per-category shrinkage: in-sample 0.493,
@@ -98,62 +154,31 @@ The HF Jobs path is proven end to end: install, video download, GPU detection, c
 * The scorer does **no unit conversion**; blank/NaN/zero are hard zeros; any empty category makes
   the whole average undefined.
 * Aggregate ensembles in **log space**, never an arithmetic mean.
+* The 20-row detection cache lives in `prarabdhmisra/quantiphy-runs`. Replaying it is free — do that
+  before proposing any GPU spend on a solver-logic question.
 
 ## Team
 
 **Vector Syndicate** — 2 people. Organizer email **sent 2026-08-01** (contents in
 `ORGANIZER-EMAIL.md`).
 
-## Organizers' reply — 2026-08-02
+## Organizers — nothing new as of 2026-08-05
 
-They answered two of the six questions. **Neither blocker remains.**
+They wrote again saying the webpage has "a new template" and that the leaderboard will not go up
+"any time soon". Both were checked against the live site:
 
-1. **Submission format: solved.** They posted a real template at
-   `https://quantiphy.stanford.edu/competition/eval/quantiphy_submission_template.csv`, now pinned
-   at `data/fixtures/quantiphy_submission_template.csv` with its SHA-256 in that folder's README.
-   3,289 rows; `id` is 1-based and contiguous, so **`id == parquet row index + 1`** — the guess in
-   the email was right. Every shared column matches `test_dataset.parquet` row-for-row with zero
-   mismatches. `scripts/make_submission.py` builds against it; `scripts/validate_submission.py`
-   diffs against it. Re-check the hash before any real submission — they have changed the linked
-   "template" once already.
+* The template is **byte-identical** to the pinned copy — same SHA-256, same 739,113 bytes, and
+  both it and `competition/index.html` still report `Last-Modified: Sun, 02 Aug 2026 13:29:16 GMT`.
+  Their message refers to the update we already absorbed on 2026-08-02. **No code work follows.**
+* `leaderboard.html`, `submit.html`, `upload.html`, `rules.html` all still 404.
 
-2. **No leaderboard "any time soon"; it appears "when the deadline approaches."**
-   `leaderboard.html`, `submit.html` and `upload.html` all still 404. The consequence matters more
-   than the fact: **there is no external feedback signal until roughly October.** So —
-   * `quantiphy/scoring.py` on the 159-row validation split is the *only* evidence we get, at
-     ±5.7 pt. Treat sub-6-point "improvements" as noise unless `paired_bootstrap` says otherwise.
-   * The 3-per-day submission quota is irrelevant for now; nothing is gained by rationing.
-   * The upload path stays untested until crunch time. Mitigated by building and freezing the
-     submission writer now, so only one column is left to fill at the deadline.
+Consequence, unchanged: **no external feedback signal until roughly October.** `quantiphy/scoring.py`
+on the 159-row validation split is the only evidence we get, at ±5.7 pt. The 3-per-day quota is
+irrelevant for now. The upload path stays untested until crunch time.
 
 **Still unanswered** (parked until ~September, none of it blocking): which deadline is
 authoritative, fine-tuning / external data / ensemble rules, whether gated weights count as
-open-weight, and team eligibility across tracks. Draft is still in `ORGANIZER-EMAIL.md`.
-
-## Next actions, in order
-
-1. **Full 159-row validation run** (`l4x1`, ~1–3 h detached, roughly $5–15). 20 rows cannot tell a
-   systematic bias from a small sample, and every decision below depends on knowing which it is.
-   Read **coverage-limited** (is the geometry right?) separately from **as-submitted**
-   (unsolved = 0, what the leaderboard would say).
-2. **Diagnose the 2.4× undershoot before building anything new.** If the median pred/truth ratio
-   holds near 0.42 across 159 rows it is a bug with a single cause, and fixing it is worth more
-   than any new component. Check in this order:
-   * Is the *prior* object's box systematically larger than the object? That alone produces exactly
-     this signature. Dump a few annotated frames and look.
-   * Does the target measurement use the right axis — width vs height vs diagonal — for the
-     quantity the question asks about?
-   * Is the depth-ratio correction firing on 2D rows where it should not?
-
-   Resist the urge to fit a global correction factor. `paired_bootstrap` first, and note the
-   standing warning against calibrating on this split.
-3. Fix `parse_prior` for the `name ~ value unit` form. Cheap, and it stops 6 validation rows from
-   masquerading as solver failures. **Worth ~0 points on test** — do not confuse it with progress.
-4. Build the **fallback arm** (VLM estimate) and fuse in log space. Until then every unsolved row
-   is a hard zero. `scripts/make_submission.py` already applies a per-(category, unit) median as a
-   floor, so this is an upgrade to that, not a new hole.
-5. Then: SAM2 masks for extent (boxes overestimate non-rectangular objects — and step 2 suggests
-   that is already costing us), CoTracker3 where the quadratic fit quality is low.
+open-weight, and team eligibility across tracks.
 
 ## Submitting
 
@@ -165,21 +190,16 @@ py -3.12 scripts/validate_submission.py sub.csv        # must exit 0
 `make_submission.py` fills `parsed_value` in the pinned official template and copies every other
 column through untouched; `validate_submission.py` diffs the result against that template
 row-for-row. Re-check the template's SHA-256 against the live file first — see
-`data/fixtures/README.md`. `--shrink` is available and **unmeasured**: overshoot is fatal and
-undershoot is cheap, so a value below 1.0 should help the fallback rows, but nobody has measured
-how far. Leave it at 1.0 until it is tested with `paired_bootstrap`.
+`data/fixtures/README.md`. `--shrink` is available and **unmeasured**; leave it at 1.0 until it is
+tested with `paired_bootstrap`.
 
 ## Notes
 
 * Compute: **Colab Pro** to iterate, **HF Jobs `l4x1`** for batch (detached, survives a closed
   laptop), Kaggle for free sweeps. Do not buy a GPU — the whole competition is tens of GPU-hours.
-* Videos are **not** stored locally (download killed at 30/568, deliberately). Colab and HF Jobs
-  fetch them on the remote machine.
-* `README.md` publicly documents the competitive analysis above. Trim it into a gitignored
-  `NOTES.md` if that becomes a concern.
-* Session of 2026-08-01 cost ~$100, mostly research. Set a budget next time.
-* Session of 2026-08-02: ~$37 of Claude time, plus three `l4x1` smoke runs (well under $5 of GPU).
-  Job artifacts land in `prarabdhmisra/quantiphy-runs` (dataset repo, private) — the detection
-  cache there is warm for the first 20 validation rows, so re-running them is free and instant.
-  Two of the three runs were spent on bugs, not results: `uv run` environments ship no `pip`, and
-  a `LIMIT` run that misses a category used to crash rather than report. Both are fixed.
+* Videos are **not** stored locally. Colab and HF Jobs fetch them on the remote machine.
+* `README.md` publicly documents the competitive analysis. Trim it into a gitignored `NOTES.md` if
+  that becomes a concern.
+* Session of 2026-08-01 cost ~$100, mostly research. 2026-08-02: ~$37 plus three `l4x1` smoke runs.
+* Session of 2026-08-05: diagnosis done entirely offline against the cached detections, then one
+  20-row confirm run. The lesson worth keeping: **the cache made a $5–15 blind run unnecessary.**
