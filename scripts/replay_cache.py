@@ -32,7 +32,12 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from quantiphy.backends.grounding import displacement_px, extent_for, kinematics  # noqa: E402
+from quantiphy.backends.grounding import (  # noqa: E402
+    centroid_at,
+    displacement_px,
+    extent_for,
+    kinematics,
+)
 from quantiphy.parsing import build_request  # noqa: E402
 from quantiphy.solver import solve_row  # noqa: E402
 from quantiphy.vision import PixelMeasurement  # noqa: E402
@@ -44,10 +49,10 @@ VALIDATION = "PaulineLi/QuantiPhy-validation"
 class CachedBackend:
     """A :class:`~quantiphy.vision.VisionBackend` fed from a pickled detection cache.
 
-    Deliberately reuses ``extent_for``/``kinematics``/``displacement_px`` from the real backend
-    rather than reimplementing them -- those are pure numpy and import without torch, so a replay
-    exercises the same measurement code the GPU run did. Only the frames come from a different
-    place.
+    Deliberately reuses ``extent_for``/``kinematics``/``displacement_px``/``centroid_at`` from the
+    real backend rather than reimplementing them -- those are pure numpy and import without torch,
+    so a replay exercises the same measurement code the GPU run did. Only the frames come from a
+    different place.
     """
 
     def __init__(self, cache: dict) -> None:
@@ -72,8 +77,9 @@ class CachedBackend:
         if dimension == "length":
             extent = (displacement_px(series, *request.interval) if request.interval is not None
                       else extent_for(series, request.measurement))
-            return PixelMeasurement(object_name, extent_px=extent, confidence=confidence,
-                                    frames_tracked=tracked)
+            return PixelMeasurement(object_name, extent_px=extent,
+                                    centroid_px=centroid_at(series, request.timestamp),
+                                    confidence=confidence, frames_tracked=tracked)
 
         speed, accel, quality = kinematics(series, request.timestamp)
         return PixelMeasurement(

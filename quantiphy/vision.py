@@ -39,6 +39,11 @@ class PixelMeasurement:
     extent_px: float | None = None
     speed_px_per_s: float | None = None
     accel_px_per_s2: float | None = None
+    #: Image-space position of the object, at the request's timestamp when it names one. Not one of
+    #: the value fields above: a separation ("distance between A and B") is the gap between two
+    #: objects' centroids, so it needs a position from each of two independent measurements rather
+    #: than an extent from either. Left None by backends that cannot localise.
+    centroid_px: tuple[float, float] | None = None
     confidence: float = 0.0
     frames_tracked: int = 0
     note: str = ""

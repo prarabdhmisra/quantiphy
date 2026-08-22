@@ -140,6 +140,27 @@ def kinematics(series: DetectionSeries, at_time: float | None) -> tuple[float, f
     return speed, accel, (quality_x + quality_y) / 2.0
 
 
+def centroid_at(series: DetectionSeries, at_time: float | None) -> tuple[float, float] | None:
+    """Image-space position of the object, at ``at_time`` when the question names an instant.
+
+    Uses the same robust fit as :func:`kinematics` and :func:`displacement_px` rather than the
+    nearest raw frame, so a single missed or snapped box does not move the position. Falls back to
+    the median centroid when the trajectory is too short to fit or no instant is named -- for a
+    static object that is the best estimate anyway.
+
+    Evaluating both objects of a separation at the *same* instant is what makes the gap between
+    them meaningful: most of these questions specify "at 1.0s", and two medians taken over
+    different parts of a clip in which both objects are moving do not describe any real moment.
+    """
+    if series.times.size == 0:
+        return None
+    if at_time is None or series.times.size < 3:
+        return float(np.median(series.cx)), float(np.median(series.cy))
+    coeff_x, _ = _robust_quadratic(series.times, series.cx)
+    coeff_y, _ = _robust_quadratic(series.times, series.cy)
+    return float(np.polyval(coeff_x, at_time)), float(np.polyval(coeff_y, at_time))
+
+
 def displacement_px(series: DetectionSeries, start: float, end: float) -> float | None:
     """Straight-line centroid displacement between two timestamps."""
     if series.times.size < 2:
@@ -286,6 +307,7 @@ class GroundingDinoBackend:
                 value = extent_for(series, request.measurement)
                 confidence = base_confidence
             return PixelMeasurement(object_name=object_name, extent_px=value,
+                                    centroid_px=centroid_at(series, request.timestamp),
                                     confidence=confidence, frames_tracked=int(series.times.size))
 
         speed, accel, quality = kinematics(series, request.timestamp)

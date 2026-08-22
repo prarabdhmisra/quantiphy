@@ -102,6 +102,29 @@ def combine_speeds(tangential_si: float, radial_si: float | None) -> float:
     return math.hypot(tangential_si, radial_si)
 
 
+#: Shortest token that may match by containment. Below this, fragments collide ("car" in "cart").
+_MIN_PARTIAL_TOKEN = 4
+
+
+def _name_overlap(wanted: set[str], tokens: set[str]) -> float:
+    """How well two object names agree, counting exact token hits above partial ones.
+
+    A compound noun is often one word in the question and two in ``depth_info``, or the other way
+    round: the question asks about the "basketball" while the key is ``distance_ball_camera``. Whole
+    token equality alone scores that zero, so the row silently loses a depth it actually has.
+    Containment hits score half, which keeps a precise key winning over a loose one whenever both
+    are present.
+    """
+    exact = float(len(wanted & tokens))
+    partial = sum(
+        0.5 for left in wanted - tokens
+        for right in tokens - wanted
+        if len(left) >= _MIN_PARTIAL_TOKEN and len(right) >= _MIN_PARTIAL_TOKEN
+        and (left in right or right in left)
+    )
+    return exact + partial
+
+
 def depth_for(depths: tuple[DepthReading, ...], object_name: str | None,
               timestamp: float | None = None) -> float | None:
     """Best available distance-to-camera for an object, preferring the nearest timestamp.
@@ -119,8 +142,7 @@ def depth_for(depths: tuple[DepthReading, ...], object_name: str | None,
     wanted = set(object_name.lower().split())
     scored = []
     for reading in depths:
-        tokens = set(reading.object_name.split())
-        overlap = len(wanted & tokens)
+        overlap = _name_overlap(wanted, set(reading.object_name.split()))
         if overlap:
             scored.append((overlap, reading))
     if not scored:

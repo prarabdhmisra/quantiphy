@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from pathlib import Path
 
 import pandas as pd
@@ -15,6 +16,7 @@ from quantiphy.parsing import (
     parse_depth,
     parse_output_unit,
     parse_prior,
+    parse_question,
 )
 
 FIXTURES = Path(__file__).resolve().parent.parent / "data" / "fixtures"
@@ -249,6 +251,94 @@ def test_no_scale_prior_phrase_is_contaminated_on_the_full_test_split(
     assert contaminated == []
     # Guard the other way too: over-stripping would empty phrases and silently lose rows.
     assert groundable > 0.88 * len(test_split)
+
+
+# ------------------------------------------------------------------- separations ("A to B")
+
+@pytest.mark.parametrize("question, measurement, object_a, object_b", [
+    ("What is the distance between the white car and the bicycle at 1.0s in meters?",
+     "distance-pair", "white car", "bicycle"),
+    ("What is the distance from the bird to the roof at 1s, in meters?",
+     "distance-pair", "bird", "roof"),
+    ("What is the distance of the ball from the desk at 0.40s in meters?",
+     "distance-pair", "ball", "desk"),
+    # The descriptor is the only thing telling the two objects apart, so it has to survive.
+    ("What is the distance between the person in the black shirt and the person in the white "
+     "shirt at 1.0s in meters?",
+     "distance-pair", "person in the black shirt", "person in the white shirt"),
+    # B is the camera: a depth query, not a second object in the scene.
+    ("What is the distance in meters between the black cat and the camera at 0.5 s?",
+     "distance-camera", "black cat", None),
+    ("What is the basketball's  distance from the camera at 1.2s in meters?",
+     "distance-camera", "basketball", None),
+    # One phrase, two instances of it -- not answerable from a single best box per frame.
+    ("What is the distance between the two black lamps in meters?",
+     "distance-twin", "black lamps", None),
+    # A single object's own span really is an extent; it must not become a pair.
+    ("What is the height of the cabin floor above the ground in meters?",
+     "height", "cabin floor above the ground", None),
+])
+def test_separation_questions_recover_both_objects(
+        question: str, measurement: str, object_a: str, object_b: str | None) -> None:
+    parsed_measurement, _, parsed_a, parsed_b, _ = parse_question(question)
+    assert (parsed_measurement, parsed_a, parsed_b) == (measurement, object_a, object_b)
+
+
+def test_a_time_interval_is_not_mistaken_for_a_pair_of_objects() -> None:
+    """"between 1s and 2s" is an interval. Reading it as two objects would ground the numbers."""
+    measurement, _, target, target_b, timing = parse_question(
+        "What is the speed of the car between 1s and 2s in m/s?")
+    assert (target, target_b) == ("car", None)
+    assert timing["interval"] == (1.0, 2.0)
+    assert not measurement.startswith("distance")
+
+
+def test_every_separation_row_on_the_full_test_split_is_routed_away_from_max_extent(
+        test_split: pd.DataFrame) -> None:
+    """The assertion that proves the distance fix, at 3,289-row scale.
+
+    278 rows ask for a distance. Before the fix every one of them fell through ``extent_for`` to
+    ``max(width, height)`` -- one object's own box, where a separation between two objects was
+    asked. On the billiard rows that measured 60 px where the geometry needed 149 px and 182 px.
+
+    Each row must now land in exactly one of four buckets, and no ``distance`` row may keep the
+    bare single-object routing while naming two objects.
+    """
+    requests = [build_request(row) for _, row in test_split.iterrows()]
+    buckets = Counter(r.measurement for r in requests if r.measurement.startswith("distance"))
+
+    assert sum(buckets.values()) == 278
+    assert buckets["distance-pair"] == 183       # two phrases -> centroid separation
+    assert buckets["distance-twin"] == 44        # one phrase twice -> declines, does not guess
+    assert buckets["distance-camera"] == 10      # answered from depth_info, no vision needed
+    assert buckets["distance"] == 41             # genuinely one object's own span
+
+    # A pair row without both phrases would silently fall back to a single extent again.
+    pairs = [r for r in requests if r.measurement == "distance-pair"]
+    assert all(r.target_object and r.target_object_b for r in pairs)
+    assert all(r.target_object != r.target_object_b for r in pairs)
+    # Every camera row must have something for depth_for to match on.
+    assert all(r.target_object for r in requests if r.measurement == "distance-camera")
+
+
+def test_camera_distance_rows_are_answered_from_depth_info_without_vision(
+        test_split: pd.DataFrame) -> None:
+    """These 10 rows state their own answer in ``depth_info``; the backend is never consulted."""
+    from quantiphy.solver import solve_row
+    from quantiphy.vision import NullBackend
+
+    solved = 0
+    for _, row in test_split.iterrows():
+        request = build_request(row)
+        if request.measurement != "distance-camera":
+            continue
+        # NullBackend measures nothing, so a solved row proves no vision was involved.
+        answer = solve_row(request, NullBackend(), video_path="")
+        if answer.solved:
+            assert answer.method == "depth-info-direct"
+            assert answer.value > 0
+            solved += 1
+    assert solved >= 8
 
 
 # --------------------------------------------------------------------------- geometry

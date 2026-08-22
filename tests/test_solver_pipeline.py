@@ -12,6 +12,7 @@ import pytest
 
 from quantiphy.backends.grounding import (
     DetectionSeries,
+    centroid_at,
     displacement_px,
     extent_for,
     kinematics,
@@ -273,3 +274,72 @@ def test_end_to_end_answer_is_linear_in_the_prior() -> None:
 def test_backends_satisfy_the_declared_protocol() -> None:
     assert isinstance(NullBackend(), VisionBackend)
     assert isinstance(FakeBackend({}), VisionBackend)
+
+
+# ------------------------------------------------------------------- separations
+
+def test_separation_uses_the_gap_between_two_centroids_not_one_box() -> None:
+    """The distance fix, checked through the full solve path.
+
+    A tennis ball 6.7 cm across 40 px fixes gamma at 1.675 mm/px. Two objects whose centroids sit
+    200 px apart are therefore 33.5 cm apart -- and crucially *not* the 80 px / 13.4 cm that either
+    one's own box extent would have reported.
+    """
+    backend = FakeBackend({
+        "tennis ball": PixelMeasurement("tennis ball", extent_px=40.0, confidence=0.9),
+        "white car": PixelMeasurement("white car", extent_px=80.0, centroid_px=(100.0, 100.0),
+                                      confidence=0.9),
+        "bicycle": PixelMeasurement("bicycle", extent_px=80.0, centroid_px=(220.0, 260.0),
+                                    confidence=0.9),
+    })
+    answer = solve_row(build_request(row(
+        question="What is the distance between the white car and the bicycle in meters?")),
+        backend, "c.mp4")
+
+    assert answer.solved
+    assert "+separation" in answer.method
+    assert answer.value == pytest.approx(0.335, rel=1e-6)      # 200 px * 1.675 mm/px
+    assert ("bicycle", "length") in backend.calls               # both objects were measured
+
+
+def test_separation_declines_when_the_second_object_is_never_located() -> None:
+    """Falling back to one object's extent here is the confidently-wrong answer to avoid."""
+    backend = FakeBackend({
+        "tennis ball": PixelMeasurement("tennis ball", extent_px=40.0, confidence=0.9),
+        "white car": PixelMeasurement("white car", extent_px=80.0, centroid_px=(100.0, 100.0),
+                                      confidence=0.9),
+    })
+    answer = solve_row(build_request(row(
+        question="What is the distance between the white car and the bicycle in meters?")),
+        backend, "c.mp4")
+
+    assert not answer.solved
+    assert "separation needs both objects located" in answer.reason
+
+
+def test_twin_separation_declines_rather_than_measuring_one_instance() -> None:
+    """"between the two cars" cannot be answered from a single best box per frame."""
+    backend = FakeBackend({
+        "tennis ball": PixelMeasurement("tennis ball", extent_px=40.0, confidence=0.9),
+        "cars": PixelMeasurement("cars", extent_px=80.0, centroid_px=(100.0, 100.0),
+                                 confidence=0.9),
+    })
+    answer = solve_row(build_request(row(
+        question="What is the distance between the two cars in meters?")), backend, "c.mp4")
+
+    assert not answer.solved
+    assert "top-2 detections" in answer.reason
+
+
+def test_centroid_at_evaluates_the_trajectory_at_the_requested_instant() -> None:
+    """Both objects of a separation must be located at the same moment to be comparable."""
+    times = np.linspace(0.0, 2.0, 9)
+    series = DetectionSeries(
+        times=times, cx=100.0 + 50.0 * times, cy=np.full_like(times, 30.0),
+        width=np.full_like(times, 10.0), height=np.full_like(times, 10.0),
+        scores=np.full_like(times, 0.9), frames_total=9, frames_sampled=9,
+    )
+    assert centroid_at(series, 1.0) == pytest.approx((150.0, 30.0), abs=1e-6)
+    assert centroid_at(series, 2.0) == pytest.approx((200.0, 30.0), abs=1e-6)
+    # With no instant named, the median position is the best available estimate.
+    assert centroid_at(series, None) == pytest.approx((150.0, 30.0), abs=1e-6)

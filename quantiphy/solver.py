@@ -11,6 +11,7 @@ a hard zero under this metric, so there is no such thing as an acceptable gap.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 
 from quantiphy import geometry
@@ -55,10 +56,41 @@ def _measure_prior(request: SolveRequest, backend: VisionBackend,
     return backend.measure(prior_request, video_path, prior.object_name, prior.dimension), prior
 
 
+def _separation_px(first: PixelMeasurement, second: PixelMeasurement) -> float | None:
+    """Pixel gap between two located objects, or None when either could not be localised.
+
+    None rather than a guess on purpose: a missing second object silently falling back to the first
+    object's own extent is precisely the "confidently wrong" answer this path exists to remove.
+    """
+    if first.centroid_px is None or second.centroid_px is None:
+        return None
+    (x1, y1), (x2, y2) = first.centroid_px, second.centroid_px
+    return math.hypot(x2 - x1, y2 - y1) or None
+
+
 def solve_row(request: SolveRequest, backend: VisionBackend, video_path: str,
               min_confidence: float = 0.0) -> Answer:
     """Solve one row geometrically, or explain why it could not be solved."""
     unit = request.output_unit
+
+    if request.measurement == "distance-camera" and request.dimension == "length":
+        # "the distance between the cat and the camera" is a depth query, and depth_info states the
+        # answer outright. No prior, no scale transfer, no detection -- and no error either. The
+        # dimension guard matters: a depth is metres, so emitting it into a question whose unit
+        # parsed as m/s would be a silent unit error of exactly the kind this codebase avoids.
+        depth = geometry.depth_for(request.depths, request.target_object, request.timestamp)
+        if depth is None:
+            return Answer(None, unit, reason="distance-to-camera with no matching depth reading")
+        return Answer(value=from_si(depth, unit), unit=unit, confidence=1.0,
+                      method="depth-info-direct")
+
+    if request.measurement == "distance-twin":
+        # "the distance between the two cars": one phrase, two instances of it. The detector keeps
+        # only the single best box per frame, so the pair cannot be recovered. Declining costs a
+        # fallback; measuring one car's box would confidently report ~1/3 of the real separation,
+        # and a 3x overshoot or undershoot scores zero either way.
+        return Answer(None, unit, reason="separation between two instances of one phrase "
+                                         "needs top-2 detections")
 
     prior_measurement, prior = _measure_prior(request, backend, video_path)
     if prior is None:
@@ -76,7 +108,24 @@ def solve_row(request: SolveRequest, backend: VisionBackend, video_path: str,
 
     target_name = request.target_object or prior.object_name
     target_measurement = backend.measure(request, video_path, target_name, request.dimension)
-    target_pixels = target_measurement.value_for(request.dimension)
+
+    separation = None
+    if request.measurement == "distance-pair" and request.target_object_b:
+        # The question asks how far apart two objects are, which is the gap between their centroids
+        # -- not either one's own box extent. Measuring the extent here is what made these rows
+        # report ~60 px where the geometry needed ~150-180 px.
+        second = backend.measure(request, video_path, request.target_object_b, request.dimension)
+        separation = _separation_px(target_measurement, second)
+        if separation is None:
+            return Answer(None, unit,
+                          reason=f"separation needs both objects located: "
+                                 f"{target_measurement.note or 'ok'} / {second.note or 'ok'}")
+        target_measurement = replace(
+            second, object_name=f"{target_name} <-> {request.target_object_b}",
+            confidence=min(target_measurement.confidence, second.confidence))
+
+    target_pixels = (separation if separation is not None
+                     else target_measurement.value_for(request.dimension))
     if not target_pixels:
         return Answer(None, unit, reason=f"target not measured: {target_measurement.note}")
 
@@ -107,6 +156,8 @@ def solve_row(request: SolveRequest, backend: VisionBackend, video_path: str,
                       reason=f"confidence {confidence:.3f} below {min_confidence:.3f}")
 
     method = "geometric-3d" if use_depth else "geometric-2d"
+    if separation is not None:
+        method += "+separation"
     if radial:
         method += "+radial"
     if not request.target_object:

@@ -65,6 +65,47 @@ _TIME_BETWEEN = re.compile(
 )
 _TIME_AFTER = re.compile(r"\bafter\s+(\d+(?:\.\d+)?)\s*s\b", re.IGNORECASE)
 
+#: The two objects a separation is measured across: "distance between A and B", "distance from A to
+#: B". Matched on the raw question, because ``_strip_object`` truncates at "between"/"from" and so
+#: destroys B before it can be seen. 144 + 34 test rows.
+_PAIR_BETWEEN = re.compile(r"\bbetween\s+(?P<a>.+?)\s+and\s+(?P<b>.+?)(?:\s*[\?？]|$)",
+                           re.IGNORECASE)
+_PAIR_FROM_TO = re.compile(r"\bfrom\s+(?P<a>.+?)\s+to\s+(?P<b>.+?)(?:\s*[\?？]|$)", re.IGNORECASE)
+#: "the distance **of the ball from the desk**" -- the same separation, stated the other way round.
+_PAIR_OF_FROM = re.compile(r"\bof\s+(?P<a>.+?)\s+from\s+(?P<b>.+?)(?:\s*[\?？]|$)", re.IGNORECASE)
+#: "the **basketball's** distance from the camera" -- the object is the possessive, not an "of".
+_PAIR_POSSESSIVE = re.compile(
+    r"\b(?:the\s+)?(?P<a>[A-Za-z][A-Za-z\s]*?)['’]s\s+(?:\w+\s+)*?distance\s+from\s+"
+    r"(?P<b>.+?)(?:\s*[\?？]|$)", re.IGNORECASE)
+
+#: A trailing unit clause ("in meters", ", in cm"). Cut from a separation phrase before anything
+#: else, so the descriptive "in"/"on" that disambiguates an object ("the person **in the black
+#: shirt**", "the box **on the cart**") can be kept -- ``_strip_object`` cuts at any "in", which
+#: collapses both people in "between the person in the black shirt and the person in the white
+#: shirt" to the same bare "person" and loses the pair entirely.
+_TRAILING_UNIT = re.compile(
+    r"[\s,]*\bin\s+(?:meters?|metres?|centimet\w*|millimet\w*|kilometer\w*|cm|mm|km|m)\b.*$",
+    re.IGNORECASE)
+#: A trailing time or qualifier clause on a separation phrase.
+_TRAILING_CLAUSE = re.compile(r"\s+\b(?:at|when|during|after|before)\b.*$", re.IGNORECASE)
+#: The interrogative lead-in ("What is the ..."). A real object phrase never opens with one, and the
+#: possessive pattern can otherwise capture it: "What is the basketball's distance from the camera"
+#: would yield "What is the basketball".
+_QUESTION_LEAD = re.compile(r"^\s*(?:what|which|how)\b.*?\b(?:is|are|was|were)\b\s*", re.IGNORECASE)
+
+#: "the distance between the **two cars**" -- one phrase, two instances of it. 48 test rows. The
+#: detector keeps only the single best box per frame, so these cannot be answered yet; they are
+#: named here so the solver can decline instead of silently measuring one car's box extent.
+_PAIR_TWIN = re.compile(r"\bbetween\s+(?:the\s+)?(?:two|both|2)\s+(?P<a>.+?)(?:\s*[\?？]|$)",
+                        re.IGNORECASE)
+
+#: B naming the camera is a depth query, not a second object in the scene -- and ``depth_info``
+#: already carries the answer exactly. 10 test rows.
+_CAMERA = re.compile(r"\b(camera|viewer|lens|observer)\b", re.IGNORECASE)
+
+#: A phrase that is really a timestamp ("between 1s and 2s"), which ``_TIME_BETWEEN`` owns.
+_LOOKS_LIKE_TIME = re.compile(r"^\s*t?\s*=?\s*\d", re.IGNORECASE)
+
 #: ``in <unit>`` anywhere in the question. Guarded against "in the center" by requiring the
 #: captured token to resolve in the unit registry.
 _UNIT_IN = re.compile(r"\bin\s+([A-Za-z][A-Za-z/^0-9²]*)", re.IGNORECASE)
@@ -111,6 +152,10 @@ class SolveRequest:
     dimension: Dimension
     measurement: str
     target_object: str | None
+    #: The second object of a separation ("distance between A and B"). Set only when
+    #: ``measurement == "distance-pair"``; the answer is then the gap between two centroids rather
+    #: than either object's own extent.
+    target_object_b: str | None = None
     timestamp: float | None = None
     interval: tuple[float, float] | None = None
     priors: tuple[Prior, ...] = ()
@@ -140,6 +185,60 @@ def _strip_object(text: str) -> str:
     cleaned = re.sub(r"^\s*(the|a|an)\s+", "", cleaned.strip(), flags=re.IGNORECASE)
     cleaned = re.sub(r"[\s,]+", " ", cleaned).strip(" ,.?？")
     return cleaned
+
+
+def _strip_pair_object(text: str) -> str:
+    """Tidy one half of a separation phrase, keeping the descriptor that disambiguates it.
+
+    Deliberately gentler than :func:`_strip_object`, which truncates at any "in"/"on" and so turns
+    both halves of "the person in the black shirt and the person in the white shirt" into a bare
+    "person". Here only the trailing unit and time clauses are cut, because for a *pair* the
+    descriptor is the whole point: two identical phrases cannot be told apart by a detector.
+    """
+    cleaned = re.sub(r"\(.*?\)", " ", text)
+    cleaned = _QUESTION_LEAD.sub(" ", cleaned)
+    cleaned = _TRAILING_UNIT.sub(" ", cleaned)
+    cleaned = _TRAILING_CLAUSE.sub(" ", cleaned)
+    cleaned = cleaned.replace("’s", "").replace("'s", "")
+    cleaned = re.sub(r"^\s*(the|a|an)\s+", "", cleaned.strip(), flags=re.IGNORECASE)
+    return re.sub(r"[\s,]+", " ", cleaned).strip(" ,.?？")
+
+
+def _separation_pair(question: str) -> tuple[str, str | None, str] | None:
+    """The two objects a "distance between A and B" question spans, and which kind it is.
+
+    Returns ``(object_a, object_b, measurement)`` or ``None`` when the question is not asking for a
+    separation at all. The measurement name is what routes the row in the solver:
+
+    ``distance-pair``    two different phrases; the answer is the gap between their centroids.
+    ``distance-camera``  B is the camera; ``depth_info`` holds the answer and no vision is needed.
+    ``distance-twin``    one phrase, two instances ("the two cars"); not yet measurable.
+
+    Order matters: the twin form has no "and", so it must be tried before the generic pair form,
+    which would otherwise pair "the two cars at 1.0s" against whatever followed an unrelated "and".
+    """
+    twin = _PAIR_TWIN.search(question)
+    if twin:
+        name = _strip_pair_object(twin.group("a"))
+        if name:
+            return name, None, "distance-twin"
+
+    for pattern in (_PAIR_BETWEEN, _PAIR_FROM_TO, _PAIR_OF_FROM, _PAIR_POSSESSIVE):
+        match = pattern.search(question)
+        if not match:
+            continue
+        raw_a, raw_b = match.group("a"), match.group("b")
+        if _LOOKS_LIKE_TIME.match(raw_a) or _LOOKS_LIKE_TIME.match(raw_b):
+            continue                            # "between 1s and 2s" -- a time interval, not a pair
+        name_a = _strip_pair_object(raw_a)
+        if not name_a:
+            continue
+        if _CAMERA.search(raw_b):
+            return name_a, None, "distance-camera"
+        name_b = _strip_pair_object(raw_b)
+        if name_b and name_b != name_a:
+            return name_a, name_b, "distance-pair"
+    return None
 
 
 def _prior_object(label: str) -> str:
@@ -244,8 +343,8 @@ def parse_depth(text: str) -> tuple[DepthReading, ...]:
     return tuple(readings)
 
 
-def parse_question(question: str) -> tuple[str, Dimension | None, str | None, dict]:
-    """Recover ``(measurement, dimension, target_object, timing)`` from the question text."""
+def parse_question(question: str) -> tuple[str, Dimension | None, str | None, str | None, dict]:
+    """Recover ``(measurement, dimension, target_object, target_object_b, timing)``."""
     lowered = question.lower()
 
     measurement, dimension = "size", None
@@ -263,6 +362,15 @@ def parse_question(question: str) -> tuple[str, Dimension | None, str | None, di
         if at:
             timing["timestamp"] = float(at.group(1))
 
+    # A separation spans two objects, so it has to be recovered from the raw question before the
+    # single-target regexes below reduce it to whichever object happens to come first.
+    target_b = None
+    if measurement == "distance":
+        pair = _separation_pair(question)
+        if pair:
+            target, target_b, measurement = pair
+            return measurement, dimension, target, target_b, timing
+
     target = None
     phrase = re.search(r"\bof\s+(?:the\s+)?(.+?)(?:\s*[\?？]|$)", question, re.IGNORECASE)
     if phrase:
@@ -273,7 +381,12 @@ def parse_question(question: str) -> tuple[str, Dimension | None, str | None, di
                              re.IGNORECASE)
         if fallback:
             target = _strip_object(fallback.group(1)) or None
-    return measurement, dimension, target, timing
+
+    if measurement == "distance" and _CAMERA.search(question):
+        # "the basketball's distance from the camera" -- no "A to B" to pair, but still a depth
+        # query that ``depth_info`` answers outright.
+        measurement = "distance-camera"
+    return measurement, dimension, target, target_b, timing
 
 
 def build_request(row) -> SolveRequest:
@@ -282,7 +395,7 @@ def build_request(row) -> SolveRequest:
     question = str(get("question") or "")
     video_type = str(get("video_type") or "")
 
-    measurement, keyword_dimension, target, timing = parse_question(question)
+    measurement, keyword_dimension, target, target_b, timing = parse_question(question)
     output_unit = parse_output_unit(question)
 
     warnings: list[str] = []
@@ -308,6 +421,7 @@ def build_request(row) -> SolveRequest:
         dimension=dimension,
         measurement=measurement,
         target_object=target,
+        target_object_b=target_b,
         timestamp=timing.get("timestamp"),
         interval=timing.get("interval"),
         priors=parse_prior(get("prior") if get("prior") is not None
