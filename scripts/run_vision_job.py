@@ -203,6 +203,9 @@ def main() -> int:
 
     records = []
     for position, (row_index, row) in enumerate(tqdm(frame.iterrows(), total=len(frame))):
+        # NaN, not 0.0, when unknown: a resumed row's confidence was not recorded by the older
+        # run that produced it, and 0.0 would read as "measured, and hopeless".
+        confidence = float("nan")
         if row_index in done:
             value, method, reason = done[row_index]
         elif row["video_path"] is None:
@@ -213,6 +216,7 @@ def main() -> int:
                 answer = solve_row(request, backend, str(row["video_path"]))
                 value = answer.value if answer.solved else None
                 method, reason = answer.method, answer.reason
+                confidence = answer.confidence
             except Exception as error:                             # noqa: BLE001
                 # One bad row must not lose hours of work.
                 value, method, reason = None, "none", f"{type(error).__name__}: {error}"
@@ -226,6 +230,10 @@ def main() -> int:
             "parsed_value": value,
             "method": method,
             "reason": reason,
+            # Recorded because the confidence gate is fitted on it: firing the solver only where it
+            # beats the fallback constant is worth more than any other change on the board, and
+            # without this column the gate can only be fitted by replaying detections.pkl.
+            "confidence": confidence,
         })
 
         if (position + 1) % CHECKPOINT_EVERY == 0:
