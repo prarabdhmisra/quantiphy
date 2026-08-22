@@ -75,12 +75,17 @@ def main() -> int:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--template", type=Path, default=TEMPLATE)
     parser.add_argument("--validation", type=Path, default=VALIDATION)
+    parser.add_argument("--shrink", type=float, default=1.0,
+                       help="multiplier on every baseline value; <1 trades overshoots for "
+                            "undershoots, which MRA charges asymmetrically")
     args = parser.parse_args()
 
     template = pd.read_csv(args.template, dtype=str, keep_default_na=False, encoding="utf-8-sig")
     validation = pd.read_csv(args.validation, encoding="utf-8-sig")
 
-    values = baseline_values(template, validation)
+    # Note `make_submission.py --shrink` cannot do this job: it scales only *fallback* rows, and
+    # every row here is a prediction, so it would be a silent no-op.
+    values = baseline_values(template, validation) * args.shrink
     predictions = pd.DataFrame({"id": template["id"], "parsed_value": values})
     predictions.to_csv(args.out, index=False, encoding="utf-8")
 
