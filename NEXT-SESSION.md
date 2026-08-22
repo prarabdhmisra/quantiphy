@@ -120,6 +120,66 @@ Added 2026-08-22:
 **Expect the solved count on test to drop.** 325 rows move from "confidently wrong" to "unsolved →
 fallback". That is the right side of a metric where overshoot is fatal, not a regression.
 
+## First real test score: 0.364 — and it reframes everything
+
+Submitted 2026-08-22, `baseline.submission.csv`, **zero vision**: just the median validation answer
+per (category, unit). Scored on the hidden 3,289-row test set.
+
+| | S2 | D2 | S3 | D3 | **macro** |
+|---|---|---|---|---|---|
+| zero-vision constant | 0.337 | 0.311 | 0.410 | 0.396 | **0.364** |
+
+3,289 matched, 0 missing, 0.0% invalid — the submission path is proven end to end.
+
+**Two things this buys that matter more than the score.**
+
+1. The server's "Average MRA" is *exactly* the macro average `quantiphy/scoring.py` computes —
+   confirmed to four decimals. Our scorer is the real scorer.
+2. Our offline LOO estimate of this same submission was **0.3673** against a measured **0.364**. The
+   validation split predicts the test score to within ~0.003, so offline iteration is trustworthy
+   and a submission slot is for confirmation, not exploration.
+
+### The uncomfortable part: the solver currently loses to a constant
+
+Scoring the 16 rows the solver actually solved in the last replay, under the real metric:
+
+| | MRA |
+|---|---|
+| geometric solver, on rows it solved | **0.312** |
+| zero-vision constant, same metric | **0.364** |
+| rows scoring exactly 0 | **7 of 16** |
+
+Firing the solver ungated *costs* points. But the distribution is bimodal, not uniformly bad — the
+good rows score 0.70–1.00, far above the constant, and the bad ones score 0.00. So the entire value
+is in **knowing which is which**:
+
+```
+fire only where the solver beats the constant (oracle):  0.496
+fire everywhere (today's behaviour):                     0.312
+never fire (the constant):                               0.364
+```
+
+**Confidence gating is therefore the whole game, not a polish step** — worth roughly +13 points,
+which is the difference between last place and GPT-5.1's 53.1. `min_confidence` already exists in
+`solve_row` and still defaults to 0.0. Now that `detection_rate` is fixed, confidence is meaningful.
+This promotes old pending #3 to **#1**.
+
+For scale, the published test-split numbers: human 55.6, GPT-5.1 53.1, Gemini-2.5 Pro 49.6,
+**Qwen3-VL-32B 46.0** (the Track-B bar), InternVL-3.5-30B 40.7. A zero-vision constant at 36.4 is
+already within 4.3 points of InternVL-3.5-30B, which says a lot about how much credit MRA gives for
+the right order of magnitude.
+
+### Two zero-vision ideas, measured
+
+* **Global shrink.** LOO-optimal at 0.90 (0.3765 vs 0.3673), but +0.009 with a 95% CI of
+  [-0.006, +0.024] — **not established**. Behind `make_baseline.py --shrink`;
+  `baseline-shrink90.submission.csv` is built and ready if a slot is spare. Note
+  `make_submission.py --shrink` is a **no-op** on a baseline: it scales only *fallback* rows.
+* **Predict a learned multiple of `ground_truth_prior`** instead of a constant. **Refuted** — 0.2955
+  vs 0.3673, and the CI on the difference excludes zero, so the harm is established. `truth/prior`
+  spans 75x from p10 to p90: the prior sets the scene's scale but does not pin the answer. Do not
+  retry this.
+
 ## The distance fix — done 2026-08-22, and it works
 
 The 278 distance rows split into four mechanisms, not one. `parse_question` now returns a second
@@ -199,9 +259,10 @@ In priority order, by measured evidence rather than by hunch:
 | 1b | **Fresh detection pass for the new phrases** | ~183 | cents | The pair fix renames phrases, so those rows are cache misses. Needed before the separation numbers can be scored at scale. |
 | 1c | `distance-twin` — "between the **two cars**", one phrase twice | **44** | free-ish | Declines by design today. Needs the detector to keep its **top-2** boxes per frame, not just the best; `DetectionSeries` holds one. Small, well-defined change to `grounding.py`. |
 | 2 | **Diagnose the velocity rows** — median ratio 0.094, four of six near zero | ~1,000 | free | Biggest category and the worst performing. Replay the cache; the quadratic fit or the `fps`/timestamp path is suspect. No GPU needed. |
+| **1d** | **CONFIDENCE GATING — now the top item.** Fire the solver only where it beats the 0.364 constant | all | needs one run | Worth ~**+13 pts** (oracle 0.496 vs 0.364). See "First real test score". Fit the gate on a validation detection run, which has ground truth, then apply to test. |
 | 3 | Kill the fatal overshoots: gate on prior confidence | — | free | The `pedestrian walking` prior scored 0.341 with box width jittering 13–59 px and produced 7x overshoots. `min_confidence` already exists and is unused (`solve_row` defaults it to 0.0). Now that `detection_rate` is fixed, confidence is finally meaningful. |
 | 4 | Decide on `fix/prior-grounding-phrase` | 412 | free | Real defects, 114 tests green, but it did **not** move the metric. Merge on correctness grounds, not on a score claim. |
-| 5 | Full 159-row validation run on `l4x1` | — | ~1–3 h, $5–15 | Only after 1–3. Running it now would measure known-broken behaviour. |
+| 5 | Full 159-row validation run on `l4x1` | — | ~1–3 h, $5–15 | **Promoted: this is now the unblocking step.** It has ground truth, so it is what the confidence gate is fitted on. Do this before any full test run. |
 | 6 | Fallback arm (VLM estimate), fused in log space | 325 | ~$5 GPU | More urgent than before: 325 rows now decline by design. |
 | 7 | SAM2 masks / CoTracker3 | — | ~$10 GPU | **Deprioritised twice over.** The billiard box is already tight and correct; masks would not have helped. |
 | 7b | Depth-proxy for rows whose target has no `depth_info` entry | ~60 | free | **Do not oversell this one** — see "The depth hypothesis is also refuted" below. Worth ~60 tail rows, not the 762 it first appeared to be. |
