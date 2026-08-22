@@ -180,6 +180,70 @@ the right order of magnitude.
   spans 75x from p10 to p90: the prior sets the scene's scale but does not pin the answer. Do not
   retry this.
 
+## The 159-row validation run — and the confidence gate is REFUTED
+
+Job `6a89ee7673304676c8ec8746`, `l4x1`, `RUN_NAME=validation-distance-fix1`, **33 minutes** (not the
+1–3 h estimated, so cents). 150/159 solved (94.3%). Only two failure reasons: 7 gravity priors,
+2 `distance-twin`. Re-read it free with
+`py -3.12 scripts/fit_confidence_gate.py --run validation-distance-fix1`.
+
+| | macro MRA |
+|---|---|
+| solver, coverage-limited | 0.3294 |
+| solver, as-submitted | 0.3116 |
+| **zero-vision constant (LOO)** | **0.3707** |
+| **oracle: fire only where the solver wins** | **0.5261** |
+| GPT-5.1 on this split | 0.4856 |
+
+**The confidence gate does not work.** Every threshold from 0.0 to 0.5 scores *below* the constant:
+
+```
+gate  0.00 -> 0.3347      gate 0.20 -> 0.3422      gate 0.40 -> 0.3454
+gate  0.15 -> 0.3555      gate 0.30 -> 0.3561      gate 0.50 -> 0.3580   (best, still < 0.3707)
+```
+
+Detector confidence (`mean_score x detection_rate x fit_quality`) simply does not predict whether
+the answer is right. The 20-row preview that showed gate 0.15 at +0.105 was **noise** — its CI
+spanned zero, and that was the only reason to distrust it. Fourth single-cause theory refuted.
+
+### What did work, barely: a disagreement gate
+
+Fire the solver only when it *agrees with the constant* within a factor k. Measured on all 159 rows,
+paired bootstrap on the per-row difference:
+
+| gate | fires | macro | vs constant | 95% CI | |
+|---|---|---|---|---|---|
+| **within 1.5x** | 25 | **0.3837** | **+0.0130** | [+0.0013, +0.0252] | **excludes zero** |
+| within 1.5x, 2D only | 17 | 0.3816 | +0.0109 | [+0.0006, +0.0201] | excludes zero |
+| within 3.0x, 2D only | 39 | 0.4029 | +0.0322 | [−0.0000, +0.0509] | touches zero |
+| within 2.0x | 48 | 0.3940 | +0.0233 | [−0.0069, +0.0409] | spans zero |
+
+**Read this with real suspicion.** The 1.5x gate is the survivor of ~20 variants tested against the
+same 159 rows, so it is exactly the multiple-comparisons artifact this project has been burned by
+before (per-category shrinkage: +0.03 in-sample, −0.02 leave-one-out). A CI that *barely* excludes
+zero after twenty looks is not a finding. **Confirm it on the test set** — a submission is free and
+3,289 rows give ~20x the precision — before building anything on it.
+
+**Also refuted:** log-space blending of solver and constant. Every weight from 0.2 to 1.0 scores
+below the constant (best −0.015). Do not retry.
+
+### The real lead: `geometric-3d` is actively harmful
+
+Solver vs constant, on the rows the solver solved, split by method:
+
+| method | n | solver | constant | |
+|---|---|---|---|---|
+| `geometric-2d` | 93 | 0.317 | 0.301 | slight win |
+| `geometric-2d+separation` | 4 | 0.600 | 0.500 | win |
+| **`geometric-3d`** | **34** | **0.315** | **0.500** | **loses badly** |
+| `geometric-3d+separation` | 4 | 0.325 | 0.900 | loses badly |
+| `geometric-3d+radial` | 7 | 0.329 | 0.414 | loses |
+
+Every 3D route loses to a constant, and S3+D3 are **half** the macro score. Note this does *not*
+contradict "the depth ratio is centred on 1.0" — that measured the ratio's *distribution*, not
+whether we apply the right ratio to the right object. The suspicion is now that `depth_for` matches
+the wrong reading, so a correction gets applied backwards. **This is the most promising open lead.**
+
 ## The distance fix — done 2026-08-22, and it works
 
 The 278 distance rows split into four mechanisms, not one. `parse_question` now returns a second
@@ -259,7 +323,9 @@ In priority order, by measured evidence rather than by hunch:
 | 1b | **Fresh detection pass for the new phrases** | ~183 | cents | The pair fix renames phrases, so those rows are cache misses. Needed before the separation numbers can be scored at scale. |
 | 1c | `distance-twin` — "between the **two cars**", one phrase twice | **44** | free-ish | Declines by design today. Needs the detector to keep its **top-2** boxes per frame, not just the best; `DetectionSeries` holds one. Small, well-defined change to `grounding.py`. |
 | 2 | **Diagnose the velocity rows** — median ratio 0.094, four of six near zero | ~1,000 | free | Biggest category and the worst performing. Replay the cache; the quadratic fit or the `fps`/timestamp path is suspect. No GPU needed. |
-| **1d** | **CONFIDENCE GATING — now the top item.** Fire the solver only where it beats the 0.364 constant | all | needs one run | Worth ~**+13 pts** (oracle 0.496 vs 0.364). See "First real test score". Fit the gate on a validation detection run, which has ground truth, then apply to test. |
+| ~~1d~~ | ~~**CONFIDENCE GATING**~~ | — | done | **REFUTED 2026-08-22 on 159 rows.** Every threshold scores below the constant; detector confidence does not predict correctness. See "The confidence gate is REFUTED". |
+| **1e** | **Diagnose `geometric-3d`** — every 3D route loses to a constant (0.315 vs 0.500), and S3+D3 are **half** the score | ~1,548 | free | Now the best lead. Suspicion: `depth_for` matches the wrong reading, so the correction is applied backwards. Replay `validation-distance-fix1` — no GPU. |
+| 1f | Confirm-or-kill the 1.5x disagreement gate on the test set | all | 1 slot + test run | +0.013 with CI [+0.0013,+0.0252], but it survived ~20 variants on 159 rows. Treat as unproven until a real submission says otherwise. |
 | 3 | Kill the fatal overshoots: gate on prior confidence | — | free | The `pedestrian walking` prior scored 0.341 with box width jittering 13–59 px and produced 7x overshoots. `min_confidence` already exists and is unused (`solve_row` defaults it to 0.0). Now that `detection_rate` is fixed, confidence is finally meaningful. |
 | 4 | Decide on `fix/prior-grounding-phrase` | 412 | free | Real defects, 114 tests green, but it did **not** move the metric. Merge on correctness grounds, not on a score claim. |
 | 5 | Full 159-row validation run on `l4x1` | — | ~1–3 h, $5–15 | **Promoted: this is now the unblocking step.** It has ground truth, so it is what the confidence gate is fitted on. Do this before any full test run. |
