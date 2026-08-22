@@ -23,6 +23,11 @@ template": same hash, same 739,113 bytes, and both the template and `competition
 report `Last-Modified: Sun, 02 Aug 2026 13:29:16 GMT`. Their message refers to the update already
 pinned here. The contract has not moved.
 
+**Re-verified again 2026-08-22**: unchanged on all three counts. Checked because the submission
+portal was found to be live (`competition/auth/account.html`), which makes the template a live
+contract rather than a future one — the uploader parses `id` and `parsed_value` and rejects nothing
+else, so a column drift here would be silent.
+
 This replaces the `model_outputs/gpt-5.1.csv` the competition page used to link, which was a
 *validation* output (159 rows, with a `ground_truth_posterior` column) and not a submission format
 at all. The organizers posted this after we asked, on 2026-08-02.
