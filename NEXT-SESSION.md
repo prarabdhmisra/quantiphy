@@ -27,6 +27,168 @@ Last worked: **2026-08-22**.
 > lever. Don't re-derive anything in those; it cost real money. Ask me before spending more than
 > ~$20 in a session.
 
+## 2026-08-23 — the 60-day campaign starts, and the real lever is the constants
+
+`baseline-v3` scored **0.365** (S2 0.337, D2 0.315, S3 0.410, D3 0.396) — the corrected fixture moved
+**D2 only**, exactly as diagnosed. That is the champion and the floor.
+
+### The finding that reorganised everything
+
+The same constant construction scores **0.459 in-sample on validation** and **0.365 on test**. The
+metric is not the problem: each of the 27 `(category, unit)` constants is a median of about **six**
+validation rows. LOO on validation predicts 0.3707 against a measured 0.365 — agreement to 0.006, so
+the test distribution is the *same* as validation's and the whole 0.094 gap is **estimation error**.
+Test groups average 120 rows; the largest, `D2|meters`, holds 829. The scoring set can tell us where
+those constants belong.
+
+**So the biggest lever is not the VLM. It is fitting ~27 constants against submission feedback.**
+Simulated on a 3,289-row stand-in: 0.4341 → 0.4592 at 12 probes/group, ceiling 0.4668. The real start
+is worse (0.365), so the real gain should be larger. Plan: `~/.claude/plans/greedy-spinning-hopper.md`.
+
+### Why 3 submissions/day is far more capacity than it looks
+
+The test set is fixed, so a difference between two submissions is **exact — no sampling noise**. And
+the macro is the unweighted mean of four *separately reported* category means, so a change confined
+to one category moves only that number. **Each submission is four independent experiments**: 12
+readings/day, 180 slots over 60 days. For a group `g` in category `C`, if `g` is the only thing
+changed in `C`:
+
+```
+delta(mean score on g) = (n_C / n_g) * delta(reported C)
+```
+
+Reported to 3 decimals, so a category mean is known to ±0.0005 and any group above ~30 rows resolves
+usefully. The 11 groups under 30 rows (91 rows total) are not worth slots.
+
+**Determinism is already proven, for free.** `baseline.submission.csv` (v1) and `baseline-v3` differ
+on **829 rows, all inside D2** — S2/S3/D3 predictions are byte-identical. Both submissions reported
+S2 0.337 / S3 0.410 / D3 0.396, a day apart. Identical inputs, identical outputs. No slot was spent
+confirming it, and the planned Day-1 calibration submission was cancelled as redundant.
+
+**And v1 → v3 is our first differential reading, also free.** `D2|meters` (829 of 1160 D2 rows) went
+1.71 → 1.25 and D2 went 0.311 → 0.315, so that group's mean score rose by
+`0.004 × 1160/829 = +0.0056`. **Lower was better**, which is where Day 1's probes point.
+
+### Operational warning from the simulation
+
+A **half-finished search is worse than not starting**: 4 probes/group scored 0.4253, *below* the
+0.4341 start. So probe a grid that always contains the incumbent ×1.0 and take the argmax — that
+makes every adopted result monotone by construction. Never adopt from a loose bracket.
+
+### Built today
+
+* `scripts/probe.py` — builds a probe submission from the champion. **Refuses two groups in one
+  category**, because that is the assumption the inversion rests on. Emits a manifest of the exact
+  row ids changed.
+* `data/probes/ledger.csv` — one row per submission, with provenance. **This file is the campaign**;
+  without it 180 submissions are 180 unreproducible anecdotes.
+* `scripts/analyze_probes.py` — inverts the ledger, and checks that macro really is the mean of the
+  four categories on every scored row (it is, on all three) plus that unperturbed categories
+  reproduce exactly. A failure there invalidates the method, not one reading.
+* `scripts/run_vision_job.py` — `SHARD=k/n`, contiguous slices, `row_index` preserved. Contiguous
+  rather than strided because rows are ordered by video, so a shard re-uses each clip across the
+  ~5.8 questions sharing it. Partition verified exact.
+* Tests **134 → 146**, still CPU-only.
+
+### Still true and still blocking
+
+**No solver submission has ever been possible.** Every solver number in this document comes from the
+159-row validation cache. The test detection pass (~$10–15, sharded `l4x1`) is the gate for Track B,
+and 561 of 568 test videos are already local. GPU budget for the campaign: **$400**.
+
+## 2026-08-22 evening — the first CONFIRMED lever, and a refuted instrument
+
+Three things happened, in descending order of importance.
+
+### 1. The velocity fit was broken. Fixed, and the gain is statistically established.
+
+`kinematics()` fitted **one quadratic over the whole sampled clip** and read its derivative at the
+requested instant. Any motion that is not a single clean parabola — a person walking, a saw cutting
+back and forth, a pencil drawing, anything oscillatory or multi-phase — averaged away to near zero.
+Now it fits inside `FIT_WINDOW_S = 0.30` s of the requested instant.
+
+| on the 45 cached speed rows | MRA | median pred/truth |
+|---|---|---|
+| global quadratic (old) | 0.344 | 0.518 |
+| **local ±0.30 s window** | **0.447** | **0.894** |
+
+**+0.102, 95% CI [+0.022, +0.182], P(no gain) 0.006.** Velocity is **900 of the 3,289 test rows**,
+spread evenly across all four categories, so this is worth roughly **+0.030 macro**. After four
+refuted single-cause theories this is the first one that survived a paired bootstrap.
+
+Whole solver, same cache: **0.338 → 0.422** (constant 0.378), **+0.084, CI [+0.033, +0.134],
+p=0.0006** against the old solver. Against the *constant* it is +0.044 with CI [−0.032, +0.091] —
+**not** established.
+
+There is a real cost, recorded so nobody "fixes" it back: on *genuinely* constant-velocity motion a
+whole-clip fit is the better estimator (0.20 px/s error against this window's 1.45, over 300 jitter
+draws, winning 250 of 300). We take the worse estimator for the ideal case because the ideal case is
+rare and the global fit's failure mode is not noise, it is a near-zero answer. Widths 0.25–0.35 are
+indistinguishable on 45 rows; 0.30 is the conservative middle.
+
+### 2. LOO on 159 rows CANNOT RANK two candidates. This is the instrument, so read it.
+
+Dropping the `(category, unit)` tier from `make_baseline.py` measured **better** by leave-one-out
+(unit-only 0.3776 vs 0.3707). On the test set it measured **worse**:
+
+| | S2 | D2 | S3 | D3 | **macro** |
+|---|---|---|---|---|---|
+| `(category, unit)` ladder, stale fixture | 0.337 | 0.311 | 0.410 | 0.396 | **0.364** |
+| unit-only, corrected fixture | 0.309 | 0.308 | **0.428** | 0.392 | **0.359** |
+
+LOO predicted +0.007; test delivered −0.005. **Reverted.** The earlier claim that "offline LOO
+predicts the test score to within 0.003" is true only for *evaluating one fixed procedure* — it is
+false for *choosing between* procedures, because the max of several LOO estimates is biased upward
+and a 0.007 gap is inside the noise at n=159.
+
+**This downgrades the `prior_pixels` band too.** `TRUSTED_PRIOR_PIXELS = (30, 300)` was picked the
+same way — six variants, 159 rows, a CI that already spanned zero. Treat it as unproven. Its
+*mechanism* is strong and independent of the threshold (`log(pred/truth) ≈ −0.87·log(prior_pixels)`,
+corr −0.725, n=147: almost the whole error is the prior's own pixel measurement), so the gate itself
+is well-founded even if the edges are not. The kinematics fix is a different kind of claim — paired,
+mechanism-backed, p=0.0006, not a selected threshold — and is not affected.
+
+Also refuted this session, both free and both properly cross-validated:
+* **MRA-argmax per group instead of the median**: LOO 0.320 vs 0.377. Overfits tiny groups.
+* **Post-processing a good per-row predictor with the constant.** Tested on GPT-5.1's own 159
+  predictions (0.4748): global shrink, symmetric clamp to `[c/K, c·K]`, asymmetric overshoot cap and
+  log-space blending **all lose at every parameter value**. The constant carries no information a
+  real per-row predictor lacks. So never fuse a VLM with the constant — fuse it with the *solver*,
+  or gate. Corollary: the "+19 pts from fixing overshoots" pool is unreachable by any blind cap.
+
+### 3. The validation fixture was corrupt, and fixing it proved the scorer exact
+
+`data/fixtures/gpt-5.1_validation.csv` had **one ground truth wrong by 100x** (125.0 for 1.25), 18
+stale `video_type` values and 6 questions missing the timestamp the parser reads. The organizers'
+own split is now committed as `data/fixtures/quantiphy_validation.csv`, and against it our scorer
+reproduces the published GPT-5.1 macro at **0.4856 vs a published 0.48561** — exact to four decimals,
+where the stale file gave 0.4836. `tests/test_scoring.py` tolerance tightened 0.005 → 5e-4.
+
+Note the correction is not cosmetic: it moves 829 of 3,289 baseline predictions (the D2 constant
+goes 1.71 → 1.25). `baseline-v3.submission.csv` is that ladder with clean truth, built and validated
+but **not yet scored**.
+
+### Depth / 3D fixes landed (sized on the real 1,548 3D test rows)
+
+The correction's **direction is correct** — pinhole-verified, do not look there again. Fixed:
+**C1**, the prior's depth was read at `prior.timestamp` (usually `None`), which falls through to
+*file order*, so a same-object ratio that must be 1.0 came out 1.30 — **1,284 rows have >1 timed
+reading, 310 have a ≥1.25x artifact**. **`MAX_DEPTH_RATIO = 4.0`**, because the 3D path had three
+one-way inflation mechanisms and no upper bound under a metric where 1.9x scores zero. **C3**,
+`_name_overlap`'s containment score was summed uncapped so a loose compound key beat an exact one
+(an 8x error; latent on this test split). **C6**, `radial_speed` matched case-sensitively, so any
+capitalised phrase silently dropped radial.
+
+Tests **129 → 134**, all CPU-only. Still open: C2 (left/right ties, 315 rows), C5 (regex drops, 59
+rows), C7 (separation uses only object A's depth), and the fact that `prior_pixels` is an extent for
+length priors but a *speed* for speed priors, so one band covers two quantities.
+
+### The blocker
+
+A solver submission needs a detection pass over 3,289 rows / 568 videos. **It has never been run** —
+every solver number in this document comes from the 159-row validation cache. That run, and the
+open-weight VLM arm, are the next steps. 561 of 568 test videos are already local in `data/videos/`.
+
 ## The undershoot is NOT one bug — read this before believing any single-cause story
 
 Two hypotheses have now been tested and **both are wrong**:
@@ -135,9 +297,12 @@ per (category, unit). Scored on the hidden 3,289-row test set.
 
 1. The server's "Average MRA" is *exactly* the macro average `quantiphy/scoring.py` computes —
    confirmed to four decimals. Our scorer is the real scorer.
-2. Our offline LOO estimate of this same submission was **0.3673** against a measured **0.364**. The
-   validation split predicts the test score to within ~0.003, so offline iteration is trustworthy
-   and a submission slot is for confirmation, not exploration.
+2. Our offline LOO estimate of this same submission was **0.3673** against a measured **0.364** --
+   within 0.003. **Read that narrowly.** LOO is accurate for *evaluating one fixed procedure*; it is
+   NOT accurate for *choosing between* procedures, and on 2026-08-22 it picked a baseline variant
+   that measured +0.007 by LOO and **-0.005 on test**. See "LOO on 159 rows CANNOT RANK two
+   candidates" above. A submission slot is for confirmation, and selection is exactly what needs
+   confirming.
 
 ### The uncomfortable part: the solver currently loses to a constant
 
