@@ -27,6 +27,46 @@ Last worked: **2026-08-22**.
 > lever. Don't re-derive anything in those; it cost real money. Ask me before spending more than
 > ~$20 in a session.
 
+## The paper (arXiv 2512.19526) — three things that change the roadmap
+
+Local copy `2512.19526v1.pdf` (gitignored, 23 MB), also at huggingface.co/papers/2512.19526.
+
+### 1. Per-category baselines exist, and we are already at open-weight parity on half the metric
+
+The paper's `2S/2D/3S/3D` are the portal's `S2/D2/S3/D3`. Table 1:
+
+| | S2 | D2 | S3 | D3 | avg |
+|---|---|---|---|---|---|
+| **our mix-v1** | **35.3** | 36.8 | **44.1** | 39.6 | 38.9 |
+| Qwen3-VL-32B | 35.8 | **51.6** | 43.2 | **53.4** | 46.0 |
+| GPT-5.1 | 46.3 | 56.2 | 51.5 | 58.3 | 53.1 |
+| Human | 50.0 | 59.1 | 55.2 | 57.9 | 55.6 |
+
+**We match Qwen3-VL-32B on S2 and beat it on S3.** The whole gap is D2 and D3 -- the dynamic-prior
+categories, exactly where the derivative-order finding predicts we are weakest.
+
+**So the VLM arm's job is D2 and D3, not everything.** Solver on S2/S3 + a Qwen-class VLM on D2/D3
+composes to `(35.3+51.6+44.1+53.4)/4` = **46.1**, and per-category composition is proven exact.
+That is the single clearest path from 0.389 to ~0.46.
+
+### 2. Their own experiment proves our structural edge
+
+Counterfactual analysis multiplies the prior by 0.001 to 700 and finds **most models' MRA drops
+~80%**. And *prior-only* (video removed entirely) scores close to video+prior. Their words: VLMs
+"behave less like visual measurers and more like powerful guessers conditioned on textual hints."
+
+Our solver actually consumes the prior's numeric value. So the hybrid should beat either arm rather
+than merely averaging them -- and on any scene scaled unusually, we should win outright.
+
+### 3. Chain-of-thought is mostly catastrophic here. Fix the prompt before spending GPU.
+
+Table 2's CoT column against video+prior: 56.1 -> 27.7, 49.8 -> 22.4, 50.1 -> 23.1. CoT roughly
+halves MRA for most models (one small model improves; the strong ones all collapse).
+
+`quantiphy/prompting.py` currently says *"Keep any reasoning to one or two sentences, then end with
+ANSWER:"* -- mild CoT, and this says it may be harmful. **A/B a direct-answer variant on the 159
+validation rows before any test pass.** Cheap, and it may be worth more than the model size.
+
 ## The dataset card decodes video_type — and it explains D3 completely
 
 From `PaulineLi/QuantiPhy`'s README, read 2026-08-23. **`video_type` is `[P][D][O][B]`:**

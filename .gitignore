@@ -26,3 +26,6 @@ venv/
 # Never commit credentials.
 .env
 *.token
+
+# The paper: 23 MB, and it lives on the Hub and arXiv anyway.
+*.pdf
