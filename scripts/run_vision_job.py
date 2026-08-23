@@ -19,13 +19,17 @@
 Why a Job rather than a notebook: the full test split is 3,289 rows over 568 videos, which is
 hours of detection. A Job runs detached, so a closed laptop or a dropped tab doesn't kill it.
 
-    hf jobs uv run --flavor l4x1 --timeout 6h --secrets HF_TOKEN \
+    hf jobs uv run --detach --flavor l4x1 --timeout 6h --secrets HF_TOKEN \
       --env QUANTIPHY_GIT=git+https://github.com/<you>/quantiphy.git \
       --env OUTPUT_REPO=<you>/quantiphy-runs \
       --env SPLIT=validation \
       scripts/run_vision_job.py
 
 Designed around the two things that actually go wrong on long jobs:
+
+``--detach`` is not optional. Without it the CLI attaches and streams, and killing the client
+cancels the job server-side -- which is how three shards of a test run were lost. The claim
+below that a closed laptop cannot kill the run is true only once the job is detached.
 
 * **It checkpoints and resumes.** Partial predictions and the detection cache are pushed to a Hub
   dataset repo every ``CHECKPOINT_EVERY`` rows. A job that dies at row 3,000 restarts from 3,000,

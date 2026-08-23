@@ -67,16 +67,31 @@ verdict = paired_bootstrap(baseline, candidate, category_labels(frame))
 HF Jobs is the right home for the full test run — `l4x1` is the sweet spot (more VRAM than a T4,
 far cheaper than an A100, and Grounding-DINO is not compute-bound):
 
+**Pass `--detach`, or the run dies with your terminal.** `hf jobs uv run` *attaches* by default and
+streams the job, and killing the client cancels the job server-side. Three shards of a test run were
+lost to exactly this. `--detach` returns a job id immediately; follow it with `hf jobs logs`.
+
+On Windows also export `PYTHONIOENCODING=utf-8`: the upload progress bar renders a block character
+the console codepage cannot encode, and the resulting `'charmap' codec` error looks like a launch
+failure *after the job has already been created*. Check `hf jobs ps -a` before relaunching, or you
+will pay for the same shard twice.
+
+The solver installs from `QUANTIPHY_GIT`, so **commit and push before launching** -- otherwise the
+job runs whatever is on the remote and the money buys a measurement of the old code.
+
+The test split is sharded: `--env SHARD=k/4` with its own `RUN_NAME`, four jobs of ~822 rows, each
+independently resumable.
+
 ```bash
 # Smoke test first -- 20 rows, ~10 minutes, confirms the whole path works before spending hours.
-hf jobs uv run --flavor l4x1 --timeout 1h --secrets HF_TOKEN \
+hf jobs uv run --detach --flavor l4x1 --timeout 1h --secrets HF_TOKEN \
   --env QUANTIPHY_GIT=git+https://github.com/<you>/quantiphy.git \
   --env OUTPUT_REPO=<you>/quantiphy-runs \
   --env SPLIT=validation --env LIMIT=20 \
   scripts/run_vision_job.py
 
 # Then the real validation run, which prints a scored result at the end.
-hf jobs uv run --flavor l4x1 --timeout 3h --secrets HF_TOKEN \
+hf jobs uv run --detach --flavor l4x1 --timeout 3h --secrets HF_TOKEN \
   --env QUANTIPHY_GIT=... --env OUTPUT_REPO=... --env SPLIT=validation \
   scripts/run_vision_job.py
 
