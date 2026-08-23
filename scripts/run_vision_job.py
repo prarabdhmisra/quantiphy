@@ -43,6 +43,9 @@ Environment:
     SPLIT             "validation" (159 rows, has ground truth) or "test" (3,289 rows)
     RUN_NAME          output folder, default "<split>-grounding". Change it whenever solver
                       behaviour changes, or the checkpoint will resume and replay stale answers.
+    SHARD             "k/n" to run only the k-th contiguous n-th of the split, e.g. 2/4. Every
+                      row keeps its original `row_index`, so shards concatenate in any order and a
+                      missing shard shows up as a gap rather than a silent shortfall.
     LIMIT             optional row cap, for a smoke test
     BOX_THRESHOLD     detection threshold, default 0.25
     MAX_FRAMES        frames sampled per clip, default 48
@@ -183,6 +186,25 @@ def main() -> int:
     HfApi().create_repo(output_repo, repo_type="dataset", exist_ok=True, private=True)
 
     frame = load_split(split)
+
+    # Sharding, not LIMIT, is how the 3,289-row test split gets run. A single job holding hours of
+    # work is a job that loses hours when it dies, and this project has twice paid for a run it
+    # could not resume. SHARD=k/n keeps every row's original index in `row_index`, so shards can be
+    # concatenated in any order and a missing shard is visible as a gap rather than a silent
+    # shortfall. Deliberately a contiguous slice rather than a stride: rows are ordered by video, so
+    # a contiguous shard re-uses each downloaded clip across the ~5.8 questions that share it.
+    frame = frame.reset_index(drop=True)
+    frame["row_index"] = frame.index
+    shard = os.environ.get("SHARD")
+    if shard:
+        index, count = (int(part) for part in shard.split("/"))
+        if not 1 <= index <= count:
+            raise SystemExit(f"SHARD={shard} is out of range; expected 1/n .. n/n")
+        bounds = [round(len(frame) * i / count) for i in range(count + 1)]
+        frame = frame.iloc[bounds[index - 1]:bounds[index]].copy()
+        log(f"SHARD {index}/{count}: rows {bounds[index - 1]}..{bounds[index] - 1} "
+            f"({len(frame)} of {bounds[-1]})")
+
     limit = os.environ.get("LIMIT")
     if limit:
         frame = frame.head(int(limit)).copy()
