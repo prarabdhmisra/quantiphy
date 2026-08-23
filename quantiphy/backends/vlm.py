@@ -84,21 +84,40 @@ class VlmBackend:
 
     # ---------------------------------------------------------------- model
 
+    @staticmethod
+    def _preferred_dtype():
+        """bfloat16 where the GPU actually supports it, float16 otherwise.
+
+        Not a detail. The free tiers this arm is meant to run on are Turing and Pascal -- Kaggle
+        offers T4 x2 and P100, and neither has native bf16 -- while the paid HF Jobs flavours are
+        Ampere or newer and do. Hardcoding bf16 either crawls through emulation or fails outright on
+        exactly the hardware we chose in order to spend nothing.
+        """
+        import torch
+        if not torch.cuda.is_available():
+            return torch.float32
+        try:
+            if torch.cuda.is_bf16_supported():
+                return torch.bfloat16
+        except Exception:
+            pass
+        return torch.float16
+
     def _load(self) -> None:
         if self._model is not None:
             return
-        import torch
         from transformers import AutoModelForImageTextToText, AutoProcessor
 
-        kwargs: dict = {"dtype": torch.bfloat16, "device_map": "auto"}
+        dtype = self._preferred_dtype()
+        kwargs: dict = {"dtype": dtype, "device_map": "auto"}
         if self.load_in_4bit:
-            # 4-bit exists to fit a 32B on hardware already paid for -- a 40 GB A100, or Kaggle's
-            # 2x16 GB. Whether it costs accuracy is a measurement, not an assumption: run it against
-            # the 159 validation rows alongside bf16 before committing a full test pass to it.
+            # 4-bit exists to fit a 32B on hardware already paid for -- Kaggle's 2x16 GB, or a 40 GB
+            # A100. Whether it costs accuracy is a measurement, not an assumption: run it against the
+            # 159 validation rows alongside full precision before committing a test pass to it.
             from transformers import BitsAndBytesConfig
             kwargs.pop("dtype")
             kwargs["quantization_config"] = BitsAndBytesConfig(
-                load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16,
+                load_in_4bit=True, bnb_4bit_compute_dtype=dtype,
                 bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True)
 
         self._processor = AutoProcessor.from_pretrained(self.model_id)
