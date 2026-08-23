@@ -27,6 +27,61 @@ Last worked: **2026-08-22**.
 > lever. Don't re-derive anything in those; it cost real money. Ask me before spending more than
 > ~$20 in a session.
 
+## The dataset card decodes video_type — and it explains D3 completely
+
+From `PaulineLi/QuantiPhy`'s README, read 2026-08-23. **`video_type` is `[P][D][O][B]`:**
+
+| pos | meaning | values |
+|---|---|---|
+| **P** | **Physical prior type** | **S = Size, V = Velocity, A = Acceleration** |
+| D | Dimensionality | 2 = 2D, 3 = 3D |
+| O | Object setting | S = single, M = multi |
+| B | Background | X = plain, S = simple, C = complex |
+
+And `inference_type` is `[prior][target]` dynamism: `DS` = **D**ynamic prior -> **S**tatic target. So the
+scored category is **`[prior dynamism][dimensionality]`** — D3 means *dynamic prior, 3D*.
+
+Also: videos are **2-3 s, static camera**. So radial depth change is real object motion, not camera
+motion, which retroactively justifies the `+radial` route.
+
+### The error scales with how many derivatives the prior needs. Measured:
+
+| prior type | n | median ratio vs constant | % over 1.9x |
+|---|---|---|---|
+| **S — Size** | 692 | **0.86** | 26% |
+| **V — Velocity** | 431 | **2.03** | 52% |
+| **A — Acceleration** | 215 | **3.52** | 69% |
+
+Monotone, and the mechanism is exact: `gamma = prior_world / prior_pixels`, and a Size prior measures
+a box extent (0th derivative), Velocity measures px/s (1st), Acceleration px/s^2 (2nd). Every
+derivative amplifies detector noise, **in the denominator of the scale factor.**
+
+This explains all four category results at once:
+
+* **S3** = static prior + 3D = 431 Size priors -> ratio 0.60 -> the solver's biggest gain (+0.031)
+* **D3** = dynamic prior + 3D = **no Size priors at all** (572 A, 400 V) -> collapsed (-0.176)
+* **D2** = dynamic prior but 2D -> still gained (+0.053). 2D tolerates a noisy prior; compounding it
+  with the depth correction is what breaks D3.
+
+**Useful negatives:** background complexity (C/S/X -> 1.37/1.14/1.55) and single-vs-multi object
+(1.35/1.50) carry almost no signal. Do not spend effort gating on them.
+
+### The lever this opens
+
+Gate on **prior type**, a free per-row feature with a mechanical justification -- not a threshold
+fitted on 159 rows. `mix-v1` already handles D3 wholesale via the constant; the finer move is to
+decline **A-prior rows inside the categories the solver won** (D2 is entirely V and A priors). One
+submission tests that in all four categories at once.
+
+### Also in that repo, not yet used
+
+* **`quantiphy_fullset_videos_480p/`** — the VLM resizes frames anyway, so this cuts Kaggle download
+  time, where bandwidth is the real constraint.
+* **`github.com/Paulineli/QuantiPhy`** — "evaluation code and a starter kit for running a VLM on
+  QuantiPhy". Likely the reference prompt and output format. Read before finalising the VLM prompt.
+* No extra ground truth anywhere: the test parquet has no posterior column, and 159 validation rows
+  remain the only truth we will ever have. Checked, so nobody looks again.
+
 ## CHAMPION: mix-v1, macro 0.389 — and the composition method is now PROVEN
 
 | | S2 | D2 | S3 | D3 | macro |
