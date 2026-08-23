@@ -27,6 +27,46 @@ Last worked: **2026-08-22**.
 > lever. Don't re-derive anything in those; it cost real money. Ask me before spending more than
 > ~$20 in a session.
 
+## CHAMPION: mix-v1, macro 0.389 — and the composition method is now PROVEN
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| baseline-v3 (constant) | 0.337 | 0.315 | 0.410 | 0.396 | 0.365 |
+| solver-v1 | 0.353 | 0.368 | 0.441 | **0.220** | 0.345 |
+| **mix-v1** (solver S2/D2/S3, constant D3) | **0.353** | **0.368** | **0.441** | **0.396** | **0.389** |
+
+Predicted 0.3895 from the two parents. Measured **0.389, with all four categories matching to the
+digit.** Build one with `scripts/select_sources.py`.
+
+### The consequence that changes how slots are spent
+
+**Categories are scored independently, exactly.** So the macro of any per-category mix of
+already-measured sources is *arithmetic, not estimation* — and therefore
+
+> **never spend a slot confirming a composition of things already measured.**
+
+This one cost a slot to prove the principle, which was worth it once. From here, compose freely
+offline and spend every slot on something *new*: a source not yet measured in that category, or a
+probe. That roughly doubles the effective information rate of the 3/day quota.
+
+It also retires a question this project failed at four times. Four attempts to build a confidence
+signal predicting when the solver is right were all refuted. Selection **sidesteps prediction**:
+measure per category on the real scoring set, then choose. No signal required.
+
+### The lesson about reading results
+
+The solver's headline (0.345) was *below* the constant's (0.365), and on the headline alone it would
+have been discarded. It was actually better in **three of four categories**. A submission is a
+measurement instrument with four channels, not a single score — read it per category, always.
+
+### D3 is now the biggest single pocket on the board
+
+The solver collapsed there, 0.396 → 0.220, and D3 is 972 rows. It was also the category the offline
+disagreement check flagged worst: median ratio **3.44** against the constant with **65%** of rows
+above 1.9x, where the other three sat between 0.61 and 1.94. That check has earned some standing.
+Detections for all 3,289 test rows are cached, so diagnosing D3 is free CPU work — and fixing it
+would be worth roughly another +0.04 on the same exact arithmetic.
+
 ## 2026-08-23 evening — the first solver submission on test, and a units trap
 
 **`solver-v1.submission.csv` is built and validated.** 3,289 rows from a 4-shard test detection pass,
