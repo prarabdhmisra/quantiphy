@@ -265,7 +265,13 @@ def main() -> int:
         if (position + 1) % CHECKPOINT_EVERY == 0:
             backend.save_cache()
             push(output_repo, name, pd.DataFrame(records), cache_path)
-            solved = sum(1 for r in records if r["parsed_value"] is not None)
+            # `is not None` is wrong here and was: a resumed row's value comes back from
+            # `pd.read_csv`, so a declined row is NaN rather than None, and `NaN is not None` is
+            # True. That reported "solved 600" against the original run's "solved 352" for the same
+            # 600 rows. Only the log was affected -- the final tally and the CSV both use pandas
+            # null semantics -- but a progress counter that lies about the gate is worse than none.
+            solved = sum(1 for r in records
+                         if r["parsed_value"] is not None and r["parsed_value"] == r["parsed_value"])
             log(f"checkpoint {position + 1}/{len(frame)} — solved {solved}")
 
     backend.save_cache()

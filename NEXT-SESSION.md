@@ -27,6 +27,56 @@ Last worked: **2026-08-22**.
 > lever. Don't re-derive anything in those; it cost real money. Ask me before spending more than
 > ~$20 in a session.
 
+## 2026-08-23 evening — the first solver submission on test, and a units trap
+
+**`solver-v1.submission.csv` is built and validated.** 3,289 rows from a 4-shard test detection pass,
+merged with zero gaps and zero duplicates. **1,338 solved (40.7%)**, 1,951 on the zero-vision
+fallback. Per-category solve rates: S2 42.5%, D2 28.4%, S3 76.6%, D3 32.9%. This is the first time a
+solver submission has been possible at all -- every earlier solver number came from the 159-row
+validation cache.
+
+### Read a cross-method comparison unit-free, or it will lie to you
+
+Median *prediction* by method looked damning: `geometric-2d` 3.21, `geometric-3d+radial` **56.66** --
+seemingly a 17x inflation, and plausible because `combine_speeds` uses `hypot` and can only push a
+number up. That reading was **wrong**, and nearly bought a harmful "fix".
+
+The confound: `cm/s` answers are numerically ~100x `m/s` answers, and `+radial` fires mostly on cm/s
+rows. Recomputed as a **ratio to the constant**, which is unit-free:
+
+| method | n | median ratio | frac > 1.9x |
+|---|---|---|---|
+| `geometric-2d` | 814 | 1.62 | 46% |
+| `geometric-3d` | 287 | 0.99 | 43% |
+| **`geometric-3d+radial`** | 120 | **1.08** | **16%** |
+| `geometric-2d+separation` | 43 | 3.09 | 53% |
+
+`+radial` is the *best-behaved* route, not the worst. And measured against real validation truth,
+radial **helps**: macro 0.4220 with it against 0.4089 without, and on the 8 rows where it fires
+0.688 against 0.400 (constant 0.475), median pred/truth 1.10 against 0.74. **Do not disable radial.**
+
+The genuine disagreement is by **unit**, not method: `meters` rows run at median ratio **2.23** over
+654 solved rows, while `m/s` sits at 1.02 and `m/s^2` at 1.14. Undershooting units (`cm` 0.47,
+`cm/s` 0.66) are cheap under MRA. Two tiny broken pockets: `mm` (4 rows, 35x) and `cm/s^2`
+(7 rows, 0.17x) -- 11 rows total, not worth a slot.
+
+**And a large disagreement with the constant says nothing about which one is right.** Validation with
+truth says the gated solver beats the constant, 0.4220 to 0.3776. Only a submission settles it.
+
+### One cosmetic bug fixed while checking
+
+`run_vision_job.py`'s checkpoint counter used `parsed_value is not None`. On a resume the value comes
+back through `pd.read_csv`, so a declined row is NaN, and `NaN is not None` is True -- it logged
+"solved 600" against the original run's "solved 352" for the same rows. The final tally and the CSV
+both use pandas null semantics, so no data was affected, but a progress counter that misreports the
+gate is worse than none.
+
+### Shard 4 died and resumed, which is why checkpointing exists
+
+Shard 4 hit ERR with **no traceback** at 657/822 after 2h11m -- a container kill, not a code fault.
+`partial.csv` held 600 rows and `detections.pkl` held the detections, so a relaunch with the same
+`RUN_NAME` replayed 600 rows in three seconds and only paid for the remaining ~222.
+
 ## 2026-08-23 — the 60-day campaign starts, and the real lever is the constants
 
 `baseline-v3` scored **0.365** (S2 0.337, D2 0.315, S3 0.410, D3 0.396) — the corrected fixture moved
