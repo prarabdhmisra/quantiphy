@@ -30,17 +30,37 @@ PUBLISHED_GPT51_INVALID = 0.06289308176100629
 
 @pytest.fixture(scope="module")
 def gpt51() -> pd.DataFrame:
-    return pd.read_csv(FIXTURES / "gpt-5.1_validation.csv", encoding="utf-8-sig")
+    """GPT-5.1's predictions scored against the *organizers'* validation split.
+
+    Deliberately two files. ``gpt-5.1_validation.csv`` is a stale snapshot of the model-output CSV:
+    one of its ground truths is wrong by 100x (125.0 where the real answer is 1.25), 18 video_type
+    values are out of date, and 6 questions have lost the explicit timestamp the parser reads. Only
+    its ``parsed_value`` column -- GPT-5.1's actual answers -- is still worth anything, so truth and
+    metadata come from ``quantiphy_validation.csv`` instead.
+
+    Row order is identical between the two (``video_id`` and ``inference_type`` match row for row),
+    which is why a positional join is safe here; the assertion below keeps it that way.
+
+    This doubles as the fixture-integrity guard: scoring real predictions against corrupted truth
+    would not reproduce the published macro, so :func:`test_reproduces_published_baseline` fails
+    loudly if either file is ever swapped for a stale copy.
+    """
+    truth = pd.read_csv(FIXTURES / "quantiphy_validation.csv", encoding="utf-8-sig")
+    predictions = pd.read_csv(FIXTURES / "gpt-5.1_validation.csv", encoding="utf-8-sig")
+    assert (truth["video_id"].to_numpy() == predictions["video_id"].to_numpy()).all()
+    return truth.assign(parsed_value=predictions["parsed_value"].to_numpy())
 
 
 def test_reproduces_published_baseline(gpt51: pd.DataFrame) -> None:
     """Our macro MRA must match the published GPT-5.1 validation score.
 
-    Tolerance is 0.005: the official script drops rows whose ground truth is missing before
-    computing invalid counts in a slightly different order, which moves the last digit or two.
+    Against the organizers' own validation split this reproduces to four decimals, so the tolerance
+    is tight on purpose. It used to be 0.005, which was slack absorbing a corrupted fixture rather
+    than any real difference in the metric: the stale truth scored 0.4836 and hid inside it. A tight
+    bound here is what makes this test an integrity check on the fixtures and not just a smoke test.
     """
     result = score(gpt51)
-    assert result.macro_mra == pytest.approx(PUBLISHED_GPT51_MACRO, abs=0.005)
+    assert result.macro_mra == pytest.approx(PUBLISHED_GPT51_MACRO, abs=5e-4)
 
 
 def test_reproduces_published_invalid_fraction(gpt51: pd.DataFrame) -> None:

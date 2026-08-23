@@ -34,7 +34,11 @@ from quantiphy.parsing import parse_output_unit  # noqa: E402
 from quantiphy.scoring import category_labels  # noqa: E402
 
 TEMPLATE = ROOT / "data" / "fixtures" / "quantiphy_submission_template.csv"
-VALIDATION = ROOT / "data" / "fixtures" / "gpt-5.1_validation.csv"
+# The organizers' own validation split, not the GPT-5.1 model-output CSV that used to live here.
+# That file is a stale snapshot: one ground truth is wrong by 100x (125.0 for 1.25), 18 video_type
+# values are out of date, and 6 questions are missing the explicit timestamp the parser reads. The
+# 0.364 baseline on the board was built from it, so its medians were computed off corrupted truth.
+VALIDATION = ROOT / "data" / "fixtures" / "quantiphy_validation.csv"
 
 
 def _keys(frame: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
@@ -49,6 +53,19 @@ def baseline_values(template: pd.DataFrame, validation: pd.DataFrame) -> pd.Seri
     The ladder is ``(category, unit)`` -> ``unit`` -> ``category`` -> everything. Unit comes before
     category because it is the scale-defining key: a category median mixing metres with m/s^2 is
     meaningless, while a unit median pooled across categories is at least dimensionally right.
+
+    Do not drop the ``(category, unit)`` tier. Leave-one-out on the 159-row validation split says
+    to -- unit-only scores 0.3776 there against this ladder's 0.3707 -- and the test set says the
+    opposite: dropping it scored **0.359 against 0.364**, and S2 alone fell from 0.337 to 0.309.
+    Measured 2026-08-22, on 3,289 rows.
+
+    The lesson is about the instrument, not the ladder. Leave-one-out over 159 rows is fine for
+    *evaluating* one fixed procedure -- it predicted this baseline's test score to 0.003 -- but it
+    cannot *rank* two of them. Taking the best of several LOO numbers is biased upward, and a 0.007
+    LOO difference is well inside the noise at this sample size. Also refuted here and not worth
+    re-testing: choosing each group's constant by maximising MRA directly, which is the estimator
+    the metric actually rewards, scores 0.320 LOO against the median's 0.377. The median wins
+    because it has almost no parameters to overfit.
     """
     truth = pd.to_numeric(validation["ground_truth_posterior"], errors="coerce")
     usable = truth[truth.notna() & (truth > 0)]
