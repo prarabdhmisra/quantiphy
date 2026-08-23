@@ -56,6 +56,29 @@ def _measure_prior(request: SolveRequest, backend: VisionBackend,
     return backend.measure(prior_request, video_path, prior.object_name, prior.dimension), prior
 
 
+#: Pixel span a scale prior must occupy for its answer to be trusted, as ``(low, high)``.
+#:
+#: This replaces gating on detector confidence, which was measured and refuted: every threshold from
+#: 0.0 to 0.5 scored *below* a constant predictor, because ``mean_score x detection_rate`` says
+#: nothing about whether the prior measured the right thing. ``prior_pixels`` does. Across 147
+#: replayed validation rows ``log(pred/truth) ~= -0.87 * log(prior_pixels)`` with correlation
+#: -0.725: almost the entire error is the prior's own pixel measurement. Median pred/truth runs 7.04
+#: for priors under 25 px and 0.08 for priors over 400 px, and both of those score a hard zero.
+#:
+#: One wart, recorded rather than hidden: ``prior_pixels`` is a pixel *extent* for a length prior but
+#: a pixel *speed* for a speed prior, so this single band is applied to two different quantities. It
+#: earns its keep empirically at both ends -- the 16 rows declined at "0.1-0.2 px" are speed priors
+#: whose object was measured as effectively stationary, which is just as unusable as a 2-pixel box --
+#: but the right fix is eventually two bands, not one. Do not read the edges as physically meaningful
+#: until that is separated.
+#:
+#: Inside the band the solver is worth firing; outside it the caller's fallback beats it. Treat the
+#: exact edges as provisional -- they were chosen from six variants on 159 rows, and while the
+#: underlying correlation is strong the resulting macro gain has a 95% CI of [-0.028, +0.087], which
+#: does not exclude zero. Confirm against the test split before building anything on the numbers.
+TRUSTED_PRIOR_PIXELS = (30.0, 300.0)
+
+
 def _separation_px(first: PixelMeasurement, second: PixelMeasurement) -> float | None:
     """Pixel gap between two located objects, or None when either could not be localised.
 
@@ -69,8 +92,13 @@ def _separation_px(first: PixelMeasurement, second: PixelMeasurement) -> float |
 
 
 def solve_row(request: SolveRequest, backend: VisionBackend, video_path: str,
-              min_confidence: float = 0.0) -> Answer:
-    """Solve one row geometrically, or explain why it could not be solved."""
+              min_confidence: float = 0.0,
+              trusted_prior_pixels: tuple[float, float] = TRUSTED_PRIOR_PIXELS) -> Answer:
+    """Solve one row geometrically, or explain why it could not be solved.
+
+    Widen ``trusted_prior_pixels`` to ``(0.0, float("inf"))`` to measure the solver ungated -- which
+    is what the replay harness does when it needs the raw distribution rather than the gated answer.
+    """
     unit = request.output_unit
 
     if request.measurement == "distance-camera" and request.dimension == "length":
@@ -129,7 +157,15 @@ def solve_row(request: SolveRequest, backend: VisionBackend, video_path: str,
     if not target_pixels:
         return Answer(None, unit, reason=f"target not measured: {target_measurement.note}")
 
-    prior_depth = geometry.depth_for(request.depths, prior.object_name, prior.timestamp)
+    # Read the prior's depth at the instant its *pixels* were measured, which is what
+    # `prior_request` above actually used -- not at `prior.timestamp`, which is frequently None.
+    # When it is None, `depth_for` falls through to the first reading in file order, so a prior and
+    # a target that are the same object at different instants get a ratio that should be exactly 1.0
+    # and is instead whatever two arbitrary readings divide to: measured at 1.30 and 0.68 on real
+    # rows. 1,284 of the 1,548 3D test rows carry more than one timed reading, and 310 of them have
+    # a same-object depth spread of 1.25x or worse, so this is the largest defect in the 3D path.
+    prior_depth_at = prior.timestamp if prior.timestamp is not None else request.timestamp
+    prior_depth = geometry.depth_for(request.depths, prior.object_name, prior_depth_at)
     target_depth = geometry.depth_for(request.depths, target_name, request.timestamp)
     use_depth = request.is_3d and prior_depth is not None and target_depth is not None
 
@@ -154,6 +190,15 @@ def solve_row(request: SolveRequest, backend: VisionBackend, video_path: str,
     if confidence < min_confidence:
         return Answer(None, unit, confidence=confidence,
                       reason=f"confidence {confidence:.3f} below {min_confidence:.3f}")
+
+    low, high = trusted_prior_pixels
+    if not low <= prior_pixels <= high:
+        # Declining is the point. The answer we would emit here is not merely noisy, it is biased by
+        # a known factor in a known direction -- and under MRA a 7x overshoot and a 0.08x undershoot
+        # both score exactly zero, so there is nothing to salvage by emitting it anyway.
+        return Answer(None, unit, confidence=confidence, prior_pixels=prior_pixels,
+                      reason=f"prior measured {prior_pixels:.1f} px, outside the trusted "
+                             f"{low:.0f}-{high:.0f} px band")
 
     method = "geometric-3d" if use_depth else "geometric-2d"
     if separation is not None:

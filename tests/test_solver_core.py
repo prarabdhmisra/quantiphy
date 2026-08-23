@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from quantiphy import geometry, units
+from quantiphy.geometry import DepthReading
 from quantiphy.parsing import (
     DepthReading,
     build_request,
@@ -423,3 +424,60 @@ def test_solve_applies_depth_and_radial_terms_together() -> None:
 def test_unusable_pixel_measurements_raise_rather_than_returning_nonsense(bad) -> None:
     with pytest.raises(geometry.ScaleError):
         geometry.gamma_from_prior(1.0, bad)
+
+# --------------------------------------------------------------- 2026-08-22 defect regressions
+
+
+def test_partial_name_overlap_never_outranks_an_exact_match() -> None:
+    """A loose compound key must not beat a precise one. It used to, by 8x.
+
+    ``distance_ball_camera = 5.0`` against ``distance_basketball_football_volleyball_camera = 40.0``:
+    the containment score was summed over the full cross product, so three partial hits scored 1.5
+    and beat the exact token's 1.0.
+    """
+    exact = geometry._name_overlap({"ball"}, {"ball"})
+    loose = geometry._name_overlap({"ball"}, {"basketball", "football", "volleyball"})
+    assert loose < exact
+
+
+def test_depth_ratio_declines_rather_than_inflating_without_bound() -> None:
+    """Overshoot is fatal under MRA, so an implausible ratio must decline, not multiply."""
+    assert geometry.depth_ratio_correction(1.0, 2.0, 1.0) == pytest.approx(2.0)
+    with pytest.raises(geometry.ScaleError):
+        geometry.depth_ratio_correction(1.0, 100.0, 1.0)
+    with pytest.raises(geometry.ScaleError):
+        geometry.depth_ratio_correction(1.0, 1.0, 100.0)
+
+
+def test_radial_speed_ignores_capitalisation() -> None:
+    """Target phrases keep their original case, so a case-sensitive match silently dropped radial."""
+    depths = (
+        DepthReading(object_name="car", distance_m=10.0, timestamp=0.0),
+        DepthReading(object_name="car", distance_m=20.0, timestamp=1.0),
+    )
+    assert geometry.radial_speed(depths, "car") == pytest.approx(10.0)
+    assert geometry.radial_speed(depths, "Car") == pytest.approx(10.0)
+
+
+def test_prior_depth_is_read_at_the_instant_its_pixels_were_measured() -> None:
+    """A prior and target that are the same object must get a ratio of exactly 1.0.
+
+    The prior's pixels are measured at the request's timestamp whenever the prior names no instant
+    of its own, but its *depth* used to be looked up with ``None`` -- which falls through to the
+    first reading in file order. Same object, two different instants, fabricated ratio.
+    """
+    depths = (
+        DepthReading(object_name="car", distance_m=17.8, timestamp=1.0),
+        DepthReading(object_name="car", distance_m=23.2, timestamp=2.0),
+    )
+    # What the fix does: both lookups use the request's instant, so the ratio is exactly 1.0.
+    prior_depth = geometry.depth_for(depths, "car", 2.0)
+    target_depth = geometry.depth_for(depths, "car", 2.0)
+    assert target_depth / prior_depth == pytest.approx(1.0)
+
+    # What the bug did, and why it mattered: a None timestamp takes the first reading in file
+    # order, so the same object against itself came out 30% larger.
+    stale_prior_depth = geometry.depth_for(depths, "car", None)
+    assert stale_prior_depth == pytest.approx(17.8)
+    assert target_depth / stale_prior_depth == pytest.approx(23.2 / 17.8)
+

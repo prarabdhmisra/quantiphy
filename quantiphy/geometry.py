@@ -69,6 +69,18 @@ def world_from_pixels(target_pixels: float, *, gamma: float | None = None,
     raise ScaleError("need either gamma, or both focal_px and depth_m")
 
 
+#: Widest depth ratio we will apply, as a factor either way.
+#:
+#: The correction's *direction* is right (a farther object subtending the same pixels really is
+#: larger), but nothing downstream bounds its magnitude, and the 3D path has three independent
+#: one-way inflation mechanisms feeding it: an arbitrary reading picked by file order, a left/right
+#: tie broken by position, and ``combine_speeds``'s ``hypot``, which can only ever push a speed up.
+#: Under MRA a prediction at 1.9x truth scores exactly zero, so an unbounded multiplier is not a
+#: rounding risk, it is a total loss. Beyond this factor the reading pair is far likelier to be a
+#: mismatch than a real perspective change, so we decline instead of emitting it.
+MAX_DEPTH_RATIO = 4.0
+
+
 def depth_ratio_correction(value_2d: float, target_depth_m: float, prior_depth_m: float) -> float:
     """Apply the ``Z_target / Z_prior`` correction to a value computed with a flat 2D scale.
 
@@ -77,14 +89,33 @@ def depth_ratio_correction(value_2d: float, target_depth_m: float, prior_depth_m
     """
     if prior_depth_m <= 0:
         raise ScaleError(f"prior depth is unusable: {prior_depth_m!r}")
-    return value_2d * (target_depth_m / prior_depth_m)
+    if target_depth_m <= 0:
+        raise ScaleError(f"target depth is unusable: {target_depth_m!r}")
+    ratio = target_depth_m / prior_depth_m
+    if not 1.0 / MAX_DEPTH_RATIO <= ratio <= MAX_DEPTH_RATIO:
+        raise ScaleError(
+            f"depth ratio {ratio:.2f} exceeds {MAX_DEPTH_RATIO:g}x; the two readings "
+            f"({prior_depth_m:.3g} m and {target_depth_m:.3g} m) are more likely mismatched "
+            f"than that far apart")
+    return value_2d * ratio
 
 
 def radial_speed(depths: tuple[DepthReading, ...], object_name: str) -> float | None:
-    """Speed along the camera axis from timestamped depth readings, or None if underdetermined."""
+    """Speed along the camera axis from timestamped depth readings, or None if underdetermined.
+
+    Matches the object the same way :func:`depth_for` does. It used to use a raw case-sensitive
+    ``in`` against an un-lowercased key, and target phrases arrive from ``_strip_object`` with their
+    original capitalisation -- so "Car" silently found nothing where "car" found a reading, and any
+    capitalised phrase dropped the radial component without a word. Reusing ``_name_overlap`` also
+    stops "left tennis ball" matching a reading for the *right* one by bare substring.
+    """
+    wanted = set(object_name.lower().split()) if object_name else set()
+    if not wanted:
+        return None
     timed = sorted(
         (d for d in depths
-         if d.timestamp is not None and object_name and object_name in d.object_name),
+         if d.timestamp is not None
+         and _name_overlap(wanted, set(d.object_name.lower().split()))),
         key=lambda d: d.timestamp,
     )
     if len(timed) < 2:
@@ -112,17 +143,21 @@ def _name_overlap(wanted: set[str], tokens: set[str]) -> float:
     A compound noun is often one word in the question and two in ``depth_info``, or the other way
     round: the question asks about the "basketball" while the key is ``distance_ball_camera``. Whole
     token equality alone scores that zero, so the row silently loses a depth it actually has.
-    Containment hits score half, which keeps a precise key winning over a loose one whenever both
-    are present.
+    Containment hits are worth half in total -- not half *each*. Summing them uncapped broke the
+    guarantee this docstring makes: the cross product is unbounded, so a key naming three objects
+    whose names all contain the wanted token scored 1.5 and beat the exact key's 1.0. Against real
+    ``depth_info`` that turned ``distance_ball_camera = 5.0m`` into
+    ``distance_basketball_football_volleyball_camera = 40.0m``, an 8x error. No test-split block
+    currently triggers it, so this is a latent bug rather than a live one -- but it is one line.
     """
     exact = float(len(wanted & tokens))
-    partial = sum(
-        0.5 for left in wanted - tokens
-        for right in tokens - wanted
-        if len(left) >= _MIN_PARTIAL_TOKEN and len(right) >= _MIN_PARTIAL_TOKEN
+    partial = any(
+        len(left) >= _MIN_PARTIAL_TOKEN and len(right) >= _MIN_PARTIAL_TOKEN
         and (left in right or right in left)
+        for left in wanted - tokens
+        for right in tokens - wanted
     )
-    return exact + partial
+    return exact + (0.5 if partial else 0.0)
 
 
 def depth_for(depths: tuple[DepthReading, ...], object_name: str | None,
