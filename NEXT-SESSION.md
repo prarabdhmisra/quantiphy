@@ -602,9 +602,24 @@ external feedback until roughly October") was wrong, and it was wrong because th
 guessed URLs instead of reading the page's own nav links. The 3-per-day quota is now the main
 budget to manage.
 
-**Still unanswered** (parked until ~September, none of it blocking): which deadline is
-authoritative, fine-tuning / external data / ensemble rules, whether gated weights count as
-open-weight, and team eligibility across tracks.
+**Team eligibility across tracks -- ANSWERED 2026-08-23**, read off the competition page rather than
+guessed. **Track A (Main)** permits "any model ... proprietary, open-weight, or hybrid"; **Track B
+(Open-Weight)** is the "same scoring rule ... but submissions must be based on publicly available
+model weights and tools". Crucially: *"Competitors may enter either or both tracks. Each track has
+its own leaderboard, evaluation protocol, and awards."* Track choice is **per upload** from a single
+template; the tracks share a registration but have independent leaderboards. "Teams of up to five.
+One team per person, per track." Deadline **Nov 5, 2026 23:59 AOE**.
+
+Consequence: **enter both, always.** Every component here is open-weight (Grounding-DINO, Qwen3-VL,
+a hand-written solver, constants fitted from the organizers' own validation split), so every upload
+is Track-B-eligible and therefore Track-A-eligible too. There is no fork in the roadmap.
+
+**Unverified and it matters:** whether opting a single upload into *both* tracks consumes one of the
+3 daily slots or two. If two, the probing throughput halves from 12 readings/day to 6. Check the
+upload form on `auth/account.html` -- it is behind a login, so it cannot be read from here.
+
+**Still unanswered** (parked, none of it blocking): which deadline is authoritative, fine-tuning /
+external data / ensemble rules, and whether gated weights count as open-weight.
 
 ## Submitting
 
