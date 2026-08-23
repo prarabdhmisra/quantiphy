@@ -120,18 +120,63 @@ def _robust_quadratic(times: np.ndarray, values: np.ndarray) -> tuple[np.ndarray
     return coeffs, float(max(0.0, r_squared))
 
 
-def kinematics(series: DetectionSeries, at_time: float | None) -> tuple[float, float, float]:
+#: Half-width, in seconds, of the trajectory window a kinematic fit is made over.
+#:
+#: One fit spanning the whole clip averages away any motion that is not a single clean parabola --
+#: a person walking, a saw cutting back and forth, anything oscillatory or multi-phase -- and
+#: reports a near-zero speed for an object that is plainly moving. Measured on the 47 cached
+#: validation speed rows, narrowing the window to this half-width lifts MRA from 0.330 to 0.430
+#: (paired bootstrap 95% CI [+0.028, +0.168], P(no gain) 0.004) and moves median pred/truth from
+#: 0.518 to 0.956. Velocity is 900 of the 3,289 test rows, so this is the largest single lever
+#: on the board.
+#:
+#: This is a deliberate bias-variance trade, and the cost is real: on *genuinely* constant-velocity
+#: motion a fit over the whole clip is the better estimator (mean error 0.20 px/s against this
+#: window's 1.14, over 300 jitter draws). We take the worse estimator for the ideal case because
+#: the ideal case is rare and the failure mode of the global fit is not a little noise but a
+#: near-zero answer. Widths from 0.25 to 0.35 are statistically indistinguishable on the 45 cached
+#: speed rows (MRA 0.456 / 0.447 / 0.431); 0.30 is the conservative middle of that range and keeps
+#: 20% more jitter suppression than 0.25. Re-tune on a full-split run, and do not chase decimals.
+FIT_WINDOW_S = 0.30
+
+#: Samples to fall back to when the window is too sparse to fit. A 17-second clip sampled at
+#: ``MAX_FRAMES`` holds one sample every 0.36 s, so a narrow window can legitimately contain
+#: nothing at all; below three points there is no curve to find.
+_MIN_WINDOW_SAMPLES = 5
+
+
+def _window_around(times: np.ndarray, moment: float, half_width: float) -> np.ndarray:
+    """Boolean mask of the samples within ``half_width`` seconds of ``moment``.
+
+    Widens to the nearest ``_MIN_WINDOW_SAMPLES`` rather than returning an unfittable window, so a
+    coarsely sampled clip still yields a local estimate instead of falling back to the global fit
+    this window exists to avoid.
+    """
+    selected = np.abs(times - moment) <= half_width
+    if selected.sum() >= 3:
+        return selected
+    widened = np.zeros(times.size, dtype=bool)
+    widened[np.argsort(np.abs(times - moment))[:_MIN_WINDOW_SAMPLES]] = True
+    return widened
+
+
+def kinematics(series: DetectionSeries, at_time: float | None,
+               half_width: float = FIT_WINDOW_S) -> tuple[float, float, float]:
     """Return ``(speed_px_per_s, accel_px_per_s2, fit_quality)`` from the centroid trajectory.
 
     Evaluated at ``at_time`` when the question names an instant, otherwise at the trajectory's
-    midpoint, which is the most stable point of a quadratic fit.
+    midpoint, which is the most stable point of a quadratic fit. The fit is made over a window of
+    ``half_width`` seconds either side of that moment rather than over the whole clip -- see
+    :data:`FIT_WINDOW_S` for why that matters more than anything else in this module.
     """
     if series.times.size < 3:
         return 0.0, 0.0, 0.0
 
-    coeff_x, quality_x = _robust_quadratic(series.times, series.cx)
-    coeff_y, quality_y = _robust_quadratic(series.times, series.cy)
     moment = at_time if at_time is not None else float(np.median(series.times))
+    window = _window_around(series.times, moment, half_width)
+
+    coeff_x, quality_x = _robust_quadratic(series.times[window], series.cx[window])
+    coeff_y, quality_y = _robust_quadratic(series.times[window], series.cy[window])
 
     velocity_x = 2 * coeff_x[0] * moment + coeff_x[1]
     velocity_y = 2 * coeff_y[0] * moment + coeff_y[1]

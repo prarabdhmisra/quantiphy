@@ -119,18 +119,52 @@ def test_constant_acceleration_recovered_exactly() -> None:
     assert speed == pytest.approx(200.0, rel=1e-6)
 
 
-def test_quadratic_fit_survives_per_frame_jitter() -> None:
-    """The reason we fit instead of differencing: 1 px of jitter at 24 fps is 24 px/s of noise."""
-    rng = np.random.default_rng(0)
+def test_local_fit_survives_per_frame_jitter() -> None:
+    """The reason we fit at all: 1 px of jitter at 24 fps is 24 px/s of noise.
+
+    Averaged over many draws rather than pinned to one seed, because a single draw of this cannot
+    tell a real regression from luck -- the per-draw error swings by more than the effect size.
+
+    Note what is deliberately *not* asserted: that the fit beats naive differencing. It no longer
+    does on this input. ``mean(|dx/dt|)`` is unbeatable on a monotone ramp with symmetric noise,
+    and a fit over the whole clip used to beat it too (mean error 0.20 px/s, winning 250 draws in
+    300). :data:`FIT_WINDOW_S` gives that up on purpose -- see the next test for what it buys.
+    """
     times = np.linspace(0, 2, 49)
-    clean = 100 * times
-    series = make_series(times, clean + rng.normal(0, 1.0, times.size), np.zeros_like(times))
+    jitter_scale = 1.0 / float(times[1] - times[0])          # 24 px/s of per-sample noise
 
-    fitted, _, _ = kinematics(series, at_time=1.0)
-    differenced = float(np.mean(np.abs(np.diff(series.cx) / np.diff(times))))
+    errors = []
+    for seed in range(200):
+        noise = np.random.default_rng(seed).normal(0, 1.0, times.size)
+        series = make_series(times, 100 * times + noise, np.zeros_like(times))
+        errors.append(abs(kinematics(series, at_time=1.0)[0] - 100.0))
 
-    assert abs(fitted - 100.0) < 3.0
-    assert abs(fitted - 100.0) < abs(differenced - 100.0)
+    # The guarantee is suppression of the noise scale, not perfection: ~1 px/s out of 24 px/s in.
+    assert float(np.mean(errors)) < jitter_scale / 8.0
+    assert float(np.percentile(errors, 95)) < jitter_scale / 4.0
+
+
+def test_local_fit_recovers_speed_a_global_fit_averages_away() -> None:
+    """Why the fit window exists, and the single largest lever measured on this benchmark.
+
+    A saw cutting back and forth, a pencil drawing, a person pacing: motion that is not one clean
+    parabola over the whole clip. One quadratic spanning all of it fits a nearly flat line through
+    the oscillation and reports an object at rest. Velocity is 900 of the 3,289 test rows, so that
+    failure was costing more than any other single defect.
+    """
+    times = np.linspace(0, 8, 193)                  # 8 s at ~24 fps
+    speed = 300.0
+    period = 2.0
+    # A triangle wave: constant |speed|, reversing direction every half period.
+    phase = (times % period) / period
+    cx = np.where(phase < 0.5, speed * period * phase, speed * period * (1.0 - phase))
+    series = make_series(times, cx, np.zeros_like(times))
+
+    local, _, _ = kinematics(series, at_time=0.5)            # mid-stroke, moving at full speed
+    globally, _, _ = kinematics(series, at_time=0.5, half_width=1e9)
+
+    assert local == pytest.approx(speed, rel=0.05)
+    assert globally < speed / 10.0                            # the global fit sees a stationary object
 
 
 def test_kinematics_needs_at_least_three_points() -> None:
