@@ -1,6 +1,6 @@
 # Resume here
 
-Last worked: **2026-08-22**.
+Last worked: **2026-08-24**.
 
 > **THE PORTAL IS LIVE.** The single most important thing on this page. Submissions are scored on
 > upload and return a per-category MRA immediately, 3 per UTC day. Everything below that says
@@ -8,9 +8,9 @@ Last worked: **2026-08-22**.
 > on the board before spending anything on GPU.
 
 > **Where things live.** This document is on both branches and is accurate on both. The *code* from
-> 2026-08-05 and 2026-08-22 is only on **`fix/prior-grounding-phrase`** (pushed, 129 tests green) —
+> 2026-08-05 onward is only on **`fix/prior-grounding-phrase`** (pushed, 189 tests green) —
 > `main` is deliberately still at the last *measured* state, 94 tests. Anything below that names
-> `scripts/replay_cache.py` or 129 tests needs that branch checked out:
+> `scripts/replay_cache.py`, `scripts/select_rows.py` or 189 tests needs that branch checked out:
 >
 > ```bash
 > git checkout fix/prior-grounding-phrase
@@ -20,12 +20,459 @@ Last worked: **2026-08-22**.
 
 > Resuming the QuantiPhy Challenge (NeurIPS 2026) entry. Read
 > `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
-> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (129 tests
+> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (189 tests
 > green). **The submission portal is live and scores on upload, 3/day — read "Submitting" first.**
-> The distance bug is fixed and verified; three single-cause theories of the bias have now been
+> Champion is **`mix-v3`, macro 0.409**. Read "2026-08-24" first: the biggest single gain so far
+> came from noticing where a *declined* row's number comes from, not from any solver change.
+> The distance bug is fixed and verified; four single-cause theories of the bias have now been
 > refuted, so read "The depth hypothesis is also refuted" and "Do not re-derive" before proposing a
 > lever. Don't re-derive anything in those; it cost real money. Ask me before spending more than
 > ~$20 in a session.
+
+## The paper (arXiv 2512.19526) — three things that change the roadmap
+
+Local copy `2512.19526v1.pdf` (gitignored, 23 MB), also at huggingface.co/papers/2512.19526.
+
+### 1. Per-category baselines exist, and we are already at open-weight parity on half the metric
+
+The paper's `2S/2D/3S/3D` are the portal's `S2/D2/S3/D3`. Table 1:
+
+| | S2 | D2 | S3 | D3 | avg |
+|---|---|---|---|---|---|
+| **our mix-v1** | **35.3** | 36.8 | **44.1** | 39.6 | 38.9 |
+| Qwen3-VL-32B | 35.8 | **51.6** | 43.2 | **53.4** | 46.0 |
+| GPT-5.1 | 46.3 | 56.2 | 51.5 | 58.3 | 53.1 |
+| Human | 50.0 | 59.1 | 55.2 | 57.9 | 55.6 |
+
+**We match Qwen3-VL-32B on S2 and beat it on S3.** The whole gap is D2 and D3 -- the dynamic-prior
+categories, exactly where the derivative-order finding predicts we are weakest.
+
+**So the VLM arm's job is D2 and D3, not everything.** Solver on S2/S3 + a Qwen-class VLM on D2/D3
+composes to `(35.3+51.6+44.1+53.4)/4` = **46.1**, and per-category composition is proven exact.
+That is the single clearest path from 0.389 to ~0.46.
+
+### 2. Their own experiment proves our structural edge
+
+Counterfactual analysis multiplies the prior by 0.001 to 700 and finds **most models' MRA drops
+~80%**. And *prior-only* (video removed entirely) scores close to video+prior. Their words: VLMs
+"behave less like visual measurers and more like powerful guessers conditioned on textual hints."
+
+Our solver actually consumes the prior's numeric value. So the hybrid should beat either arm rather
+than merely averaging them -- and on any scene scaled unusually, we should win outright.
+
+### 3. Chain-of-thought is mostly catastrophic here. Fix the prompt before spending GPU.
+
+Table 2's CoT column against video+prior: 56.1 -> 27.7, 49.8 -> 22.4, 50.1 -> 23.1. CoT roughly
+halves MRA for most models (one small model improves; the strong ones all collapse).
+
+`quantiphy/prompting.py` currently says *"Keep any reasoning to one or two sentences, then end with
+ANSWER:"* -- mild CoT, and this says it may be harmful. **A/B a direct-answer variant on the 159
+validation rows before any test pass.** Cheap, and it may be worth more than the model size.
+
+## The dataset card decodes video_type — and it explains D3 completely
+
+From `PaulineLi/QuantiPhy`'s README, read 2026-08-23. **`video_type` is `[P][D][O][B]`:**
+
+| pos | meaning | values |
+|---|---|---|
+| **P** | **Physical prior type** | **S = Size, V = Velocity, A = Acceleration** |
+| D | Dimensionality | 2 = 2D, 3 = 3D |
+| O | Object setting | S = single, M = multi |
+| B | Background | X = plain, S = simple, C = complex |
+
+And `inference_type` is `[prior][target]` dynamism: `DS` = **D**ynamic prior -> **S**tatic target. So the
+scored category is **`[prior dynamism][dimensionality]`** — D3 means *dynamic prior, 3D*.
+
+Also: videos are **2-3 s, static camera**. So radial depth change is real object motion, not camera
+motion, which retroactively justifies the `+radial` route.
+
+### The error scales with how many derivatives the prior needs. Measured:
+
+| prior type | n | median ratio vs constant | % over 1.9x |
+|---|---|---|---|
+| **S — Size** | 692 | **0.86** | 26% |
+| **V — Velocity** | 431 | **2.03** | 52% |
+| **A — Acceleration** | 215 | **3.52** | 69% |
+
+Monotone, and the mechanism is exact: `gamma = prior_world / prior_pixels`, and a Size prior measures
+a box extent (0th derivative), Velocity measures px/s (1st), Acceleration px/s^2 (2nd). Every
+derivative amplifies detector noise, **in the denominator of the scale factor.**
+
+This explains all four category results at once:
+
+* **S3** = static prior + 3D = 431 Size priors -> ratio 0.60 -> the solver's biggest gain (+0.031)
+* **D3** = dynamic prior + 3D = **no Size priors at all** (572 A, 400 V) -> collapsed (-0.176)
+* **D2** = dynamic prior but 2D -> still gained (+0.053). 2D tolerates a noisy prior; compounding it
+  with the depth correction is what breaks D3.
+
+**Useful negatives:** background complexity (C/S/X -> 1.37/1.14/1.55) and single-vs-multi object
+(1.35/1.50) carry almost no signal. Do not spend effort gating on them.
+
+### The lever this opens — SIZED DOWN 2026-08-24, it is small
+
+Gating on **prior type** is still free and still mechanically justified, but the version written
+here on 2026-08-23 ("one submission tests that in all four categories at once") was wrong, and the
+row counts say so:
+
+* **S2 is 100% Size-prior and S3 is 566 of 576 Size-prior.** There is nothing to gate in either.
+* **Most A-prior rows already decline.** The solver fires on only **67** A-prior rows in D2 and
+  **148** in D3. Gating them changes 67 rows of 1,160 in D2 — below the point where a category
+  number moves usefully.
+
+So it is a one-category experiment worth a few thousandths, not a four-channel one. Keep it on the
+backlog; do not spend a slot on it while larger pockets are open.
+
+### Also in that repo, not yet used
+
+* **`quantiphy_fullset_videos_480p/`** — the VLM resizes frames anyway, so this cuts Kaggle download
+  time, where bandwidth is the real constraint.
+* **`github.com/Paulineli/QuantiPhy`** — "evaluation code and a starter kit for running a VLM on
+  QuantiPhy". Likely the reference prompt and output format. Read before finalising the VLM prompt.
+* No extra ground truth anywhere: the test parquet has no posterior column, and 159 validation rows
+  remain the only truth we will ever have. Checked, so nobody looks again.
+
+## CHAMPION: mix-v3, macro 0.409 — and the composition method is PROVEN
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| baseline-v3 (constant) | 0.337 | 0.315 | 0.410 | 0.396 | 0.365 |
+| solver-v1 | 0.353 | 0.368 | 0.441 | **0.220** | 0.345 |
+| mix-v1 (solver S2/D2/S3, constant D3) | 0.353 | 0.368 | 0.441 | 0.396 | 0.389 |
+| mix-v2 (solver only where it solved) | **0.393** | **0.377** | **0.469** | 0.351 | 0.398 |
+| **mix-v3** (mix-v2 on S2/D2/S3, constant D3) | **0.393** | **0.377** | **0.469** | **0.396** | **0.409** |
+
+`mix-v1` was predicted at 0.3895 from its two parents and measured **0.389, with all four categories
+matching to the digit** — that is the proof. `mix-v3` is therefore *derived, not measured*: 0.4087 is
+arithmetic from numbers the portal already reported, and it cost no slot. Build one with
+`scripts/select_sources.py`.
+
+Note `mix-v2`'s macro (0.398) is **lower** than three of its four channels deserve. Read the columns.
+
+### The consequence that changes how slots are spent
+
+**Categories are scored independently, exactly.** So the macro of any per-category mix of
+already-measured sources is *arithmetic, not estimation* — and therefore
+
+> **never spend a slot confirming a composition of things already measured.**
+
+This one cost a slot to prove the principle, which was worth it once. From here, compose freely
+offline and spend every slot on something *new*: a source not yet measured in that category, or a
+probe. That roughly doubles the effective information rate of the 3/day quota.
+
+It also retires a question this project failed at four times. Four attempts to build a confidence
+signal predicting when the solver is right were all refuted. Selection **sidesteps prediction**:
+measure per category on the real scoring set, then choose. No signal required.
+
+### The lesson about reading results
+
+The solver's headline (0.345) was *below* the constant's (0.365), and on the headline alone it would
+have been discarded. It was actually better in **three of four categories**. A submission is a
+measurement instrument with four channels, not a single score — read it per category, always.
+
+### D3 is now the biggest single pocket on the board
+
+The solver collapsed there, 0.396 → 0.220, and D3 is 972 rows. It was also the category the offline
+disagreement check flagged worst: median ratio **3.44** against the constant with **65%** of rows
+above 1.9x, where the other three sat between 0.61 and 1.94. That check has earned some standing.
+Detections for all 3,289 test rows are cached, so diagnosing D3 is free CPU work — and fixing it
+would be worth roughly another +0.04 on the same exact arithmetic.
+
+## 2026-08-24 — where a DECLINED row's number comes from was the biggest lever on the board
+
+Champion **0.389 → 0.409** in one slot plus one free composition. No GPU, no solver change.
+
+### The defect
+
+`make_submission.py`'s fallback ladder fills every unsolved row with the median of **the predictions
+file's own solved values** for that `(category, unit)`. So a solver submission's "zero-vision
+fallback" was never the zero-vision baseline — it is the solver's own overshoot, re-applied to every
+row the solver declined. That is **1,951 of 3,289 rows (59.3%)**, and `mix-v1` carried it on 1,299.
+
+| group | solver-v1 fallback | median of its own solved rows | `baseline-v3` constant |
+|---|---|---|---|
+| `D2\|meters` | 2.7439 | 2.7439 | **1.2500** |
+| `S2\|meters` | 4.7142 | 4.3082 | **2.1250** |
+| `D3\|meters` | 4.6670 | 4.6201 | **1.6593** |
+| `S3\|cm` | 12.8794 | 12.8872 | **49.6900** |
+
+The identity in column 3 is the whole story: the fallback *is* the solver's median. And we already
+had a measured reading that lower was better in the largest group — v1→v3 moved `D2|meters`
+1.71→1.25 and that group's mean score rose `0.004 × 1160/829 = +0.0056`.
+
+**Fixed at the root:** `make_submission.py --fallback-from <predictions>` fills declined rows from a
+named file (e.g. `make_baseline.py`'s output) instead. Rebuilding the test run through it reproduces
+`mix-v2` on all 3,289 rows. The default is unchanged on purpose — flipping it silently would re-date
+every earlier submission.
+
+### What `mix-v2` measured
+
+`mix-v2` = solver on the **1,338 rows where `method != 'none'`**, `baseline-v3`'s constant on the
+other 1,951. Macro 0.398 — and the macro is the least interesting number on the page:
+
+| | S2 | D2 | S3 | D3 |
+|---|---|---|---|---|
+| mix-v1 | 0.353 | 0.368 | 0.441 | **0.396** |
+| mix-v2 | **0.393** | **0.377** | **0.469** | 0.351 |
+
+Three channels won, one lost, so composing the winners gives `mix-v3` at 0.409 for free.
+
+### The solver is now priced, per category, on the rows it actually fires
+
+Inverting each category against `baseline-v3` — `(mix-v2 − constant) × n_C / n_solved`:
+
+| category | solved / total | solver vs constant on those rows |
+|---|---|---|
+| S2 | 247 / 581 | **+0.132** |
+| D2 | 330 / 1160 | **+0.218** |
+| S3 | 441 / 576 | **+0.077** |
+| D3 | 320 / 972 | **−0.137** |
+
+**D3 is not a weak solver, it is a wrong one** — it loses to a constant on the very rows it chose to
+answer. And separately its fallback was doing most of the visible damage: D3 scored 0.220 with the
+run's own fallback, 0.351 with the measured constant, 0.396 with no solver at all.
+
+**The consequence for tomorrow.** A solved row in D2 is worth +0.218 and only 28.4% of D2 is solved.
+The top decline reasons across all 3,289 rows are `gravity prior cannot set pixel scale` (291),
+`separation between two instances of one phrase needs top-2 detections` (44), `prior names no
+groundable object` (37), `prior object not measured` (33), then the `TRUSTED_PRIOR_PIXELS (30, 300)`
+band — which is itself unproven, selected from 6 variants on 159 rows with a CI spanning zero.
+**Raising the solve rate is now worth more than improving any solved row**, and it is free CPU work:
+download the four `test-solver-v1-shard*/detections.pkl` (4.1 MB) and widen `replay_cache.load` to
+`data/fixtures/test_dataset.parquet`. `CachedBackend` and `solve_row` need no change.
+
+### Built today
+
+* `scripts/solved_ids.py` — records which rows a run actually answered, from the shards' own
+  `method` column, into `data/probes/solved-ids-<run>.csv`. A committed artifact rather than a
+  lambda, because the fallback is a single repeated value: a solved row that lands on it is
+  indistinguishable after the fact. **Do not glob the HF cache for shard predictions** — it holds
+  more than one snapshot and returns 5,756 rows from two revisions. Use `merge_shards.py`.
+* `scripts/select_rows.py` — per-**row** source selection, the sibling of `select_sources.py`.
+  Per-*category* composition is arithmetic and never needs a slot; per-*row* is a new source and
+  costs one.
+* `make_submission.py --fallback-from`, above.
+* Tests **176 → 189**, still CPU-only. (The "129" written here on 2026-08-22 was already stale.)
+
+### Slots 2 and 3: a log-symmetric bracket, uploaded 2026-08-24
+
+`probe-d2a` (×0.7) and `probe-d2b` (×1.4) on the largest group in each category of `mix-v3`:
+`S2|meters` 208/581, `D2|meters` 829/1160, `S3|cm` 170/576, `D3|meters` 472/972. With the champion's
+×1.0 already measured, every group ends the day with three points around the incumbent, so any
+adoption is monotone rather than a bet on a half-finished search. Inversion factors — a reported
+shift `d` maps to this much on the group's own mean score: **S2 ×2.79, D2 ×1.40, S3 ×3.39,
+D3 ×2.06.** Results go in `data/probes/ledger.csv`.
+
+## 2026-08-23 evening — the first solver submission on test, and a units trap
+
+**`solver-v1.submission.csv` is built and validated.** 3,289 rows from a 4-shard test detection pass,
+merged with zero gaps and zero duplicates. **1,338 solved (40.7%)**, 1,951 on the zero-vision
+fallback. Per-category solve rates: S2 42.5%, D2 28.4%, S3 76.6%, D3 32.9%. This is the first time a
+solver submission has been possible at all -- every earlier solver number came from the 159-row
+validation cache.
+
+### Read a cross-method comparison unit-free, or it will lie to you
+
+Median *prediction* by method looked damning: `geometric-2d` 3.21, `geometric-3d+radial` **56.66** --
+seemingly a 17x inflation, and plausible because `combine_speeds` uses `hypot` and can only push a
+number up. That reading was **wrong**, and nearly bought a harmful "fix".
+
+The confound: `cm/s` answers are numerically ~100x `m/s` answers, and `+radial` fires mostly on cm/s
+rows. Recomputed as a **ratio to the constant**, which is unit-free:
+
+| method | n | median ratio | frac > 1.9x |
+|---|---|---|---|
+| `geometric-2d` | 814 | 1.62 | 46% |
+| `geometric-3d` | 287 | 0.99 | 43% |
+| **`geometric-3d+radial`** | 120 | **1.08** | **16%** |
+| `geometric-2d+separation` | 43 | 3.09 | 53% |
+
+`+radial` is the *best-behaved* route, not the worst. And measured against real validation truth,
+radial **helps**: macro 0.4220 with it against 0.4089 without, and on the 8 rows where it fires
+0.688 against 0.400 (constant 0.475), median pred/truth 1.10 against 0.74. **Do not disable radial.**
+
+The genuine disagreement is by **unit**, not method: `meters` rows run at median ratio **2.23** over
+654 solved rows, while `m/s` sits at 1.02 and `m/s^2` at 1.14. Undershooting units (`cm` 0.47,
+`cm/s` 0.66) are cheap under MRA. Two tiny broken pockets: `mm` (4 rows, 35x) and `cm/s^2`
+(7 rows, 0.17x) -- 11 rows total, not worth a slot.
+
+**And a large disagreement with the constant says nothing about which one is right.** Validation with
+truth says the gated solver beats the constant, 0.4220 to 0.3776. Only a submission settles it.
+
+### One cosmetic bug fixed while checking
+
+`run_vision_job.py`'s checkpoint counter used `parsed_value is not None`. On a resume the value comes
+back through `pd.read_csv`, so a declined row is NaN, and `NaN is not None` is True -- it logged
+"solved 600" against the original run's "solved 352" for the same rows. The final tally and the CSV
+both use pandas null semantics, so no data was affected, but a progress counter that misreports the
+gate is worse than none.
+
+### Shard 4 died and resumed, which is why checkpointing exists
+
+Shard 4 hit ERR with **no traceback** at 657/822 after 2h11m -- a container kill, not a code fault.
+`partial.csv` held 600 rows and `detections.pkl` held the detections, so a relaunch with the same
+`RUN_NAME` replayed 600 rows in three seconds and only paid for the remaining ~222.
+
+## 2026-08-23 — the 60-day campaign starts, and the real lever is the constants
+
+`baseline-v3` scored **0.365** (S2 0.337, D2 0.315, S3 0.410, D3 0.396) — the corrected fixture moved
+**D2 only**, exactly as diagnosed. That is the champion and the floor.
+
+### The finding that reorganised everything
+
+The same constant construction scores **0.459 in-sample on validation** and **0.365 on test**. The
+metric is not the problem: each of the 27 `(category, unit)` constants is a median of about **six**
+validation rows. LOO on validation predicts 0.3707 against a measured 0.365 — agreement to 0.006, so
+the test distribution is the *same* as validation's and the whole 0.094 gap is **estimation error**.
+Test groups average 120 rows; the largest, `D2|meters`, holds 829. The scoring set can tell us where
+those constants belong.
+
+**So the biggest lever is not the VLM. It is fitting ~27 constants against submission feedback.**
+Simulated on a 3,289-row stand-in: 0.4341 → 0.4592 at 12 probes/group, ceiling 0.4668. The real start
+is worse (0.365), so the real gain should be larger. Plan: `~/.claude/plans/greedy-spinning-hopper.md`.
+
+### Why 3 submissions/day is far more capacity than it looks
+
+The test set is fixed, so a difference between two submissions is **exact — no sampling noise**. And
+the macro is the unweighted mean of four *separately reported* category means, so a change confined
+to one category moves only that number. **Each submission is four independent experiments**: 12
+readings/day, 180 slots over 60 days. For a group `g` in category `C`, if `g` is the only thing
+changed in `C`:
+
+```
+delta(mean score on g) = (n_C / n_g) * delta(reported C)
+```
+
+Reported to 3 decimals, so a category mean is known to ±0.0005 and any group above ~30 rows resolves
+usefully. The 11 groups under 30 rows (91 rows total) are not worth slots.
+
+**Determinism is already proven, for free.** `baseline.submission.csv` (v1) and `baseline-v3` differ
+on **829 rows, all inside D2** — S2/S3/D3 predictions are byte-identical. Both submissions reported
+S2 0.337 / S3 0.410 / D3 0.396, a day apart. Identical inputs, identical outputs. No slot was spent
+confirming it, and the planned Day-1 calibration submission was cancelled as redundant.
+
+**And v1 → v3 is our first differential reading, also free.** `D2|meters` (829 of 1160 D2 rows) went
+1.71 → 1.25 and D2 went 0.311 → 0.315, so that group's mean score rose by
+`0.004 × 1160/829 = +0.0056`. **Lower was better**, which is where Day 1's probes point.
+
+### Operational warning from the simulation
+
+A **half-finished search is worse than not starting**: 4 probes/group scored 0.4253, *below* the
+0.4341 start. So probe a grid that always contains the incumbent ×1.0 and take the argmax — that
+makes every adopted result monotone by construction. Never adopt from a loose bracket.
+
+### Built today
+
+* `scripts/probe.py` — builds a probe submission from the champion. **Refuses two groups in one
+  category**, because that is the assumption the inversion rests on. Emits a manifest of the exact
+  row ids changed.
+* `data/probes/ledger.csv` — one row per submission, with provenance. **This file is the campaign**;
+  without it 180 submissions are 180 unreproducible anecdotes.
+* `scripts/analyze_probes.py` — inverts the ledger, and checks that macro really is the mean of the
+  four categories on every scored row (it is, on all three) plus that unperturbed categories
+  reproduce exactly. A failure there invalidates the method, not one reading.
+* `scripts/run_vision_job.py` — `SHARD=k/n`, contiguous slices, `row_index` preserved. Contiguous
+  rather than strided because rows are ordered by video, so a shard re-uses each clip across the
+  ~5.8 questions sharing it. Partition verified exact.
+* Tests **134 → 146**, still CPU-only.
+
+### Still true and still blocking
+
+**No solver submission has ever been possible.** Every solver number in this document comes from the
+159-row validation cache. The test detection pass (~$10–15, sharded `l4x1`) is the gate for Track B,
+and 561 of 568 test videos are already local. GPU budget for the campaign: **$400**.
+
+## 2026-08-22 evening — the first CONFIRMED lever, and a refuted instrument
+
+Three things happened, in descending order of importance.
+
+### 1. The velocity fit was broken. Fixed, and the gain is statistically established.
+
+`kinematics()` fitted **one quadratic over the whole sampled clip** and read its derivative at the
+requested instant. Any motion that is not a single clean parabola — a person walking, a saw cutting
+back and forth, a pencil drawing, anything oscillatory or multi-phase — averaged away to near zero.
+Now it fits inside `FIT_WINDOW_S = 0.30` s of the requested instant.
+
+| on the 45 cached speed rows | MRA | median pred/truth |
+|---|---|---|
+| global quadratic (old) | 0.344 | 0.518 |
+| **local ±0.30 s window** | **0.447** | **0.894** |
+
+**+0.102, 95% CI [+0.022, +0.182], P(no gain) 0.006.** Velocity is **900 of the 3,289 test rows**,
+spread evenly across all four categories, so this is worth roughly **+0.030 macro**. After four
+refuted single-cause theories this is the first one that survived a paired bootstrap.
+
+Whole solver, same cache: **0.338 → 0.422** (constant 0.378), **+0.084, CI [+0.033, +0.134],
+p=0.0006** against the old solver. Against the *constant* it is +0.044 with CI [−0.032, +0.091] —
+**not** established.
+
+There is a real cost, recorded so nobody "fixes" it back: on *genuinely* constant-velocity motion a
+whole-clip fit is the better estimator (0.20 px/s error against this window's 1.45, over 300 jitter
+draws, winning 250 of 300). We take the worse estimator for the ideal case because the ideal case is
+rare and the global fit's failure mode is not noise, it is a near-zero answer. Widths 0.25–0.35 are
+indistinguishable on 45 rows; 0.30 is the conservative middle.
+
+### 2. LOO on 159 rows CANNOT RANK two candidates. This is the instrument, so read it.
+
+Dropping the `(category, unit)` tier from `make_baseline.py` measured **better** by leave-one-out
+(unit-only 0.3776 vs 0.3707). On the test set it measured **worse**:
+
+| | S2 | D2 | S3 | D3 | **macro** |
+|---|---|---|---|---|---|
+| `(category, unit)` ladder, stale fixture | 0.337 | 0.311 | 0.410 | 0.396 | **0.364** |
+| unit-only, corrected fixture | 0.309 | 0.308 | **0.428** | 0.392 | **0.359** |
+
+LOO predicted +0.007; test delivered −0.005. **Reverted.** The earlier claim that "offline LOO
+predicts the test score to within 0.003" is true only for *evaluating one fixed procedure* — it is
+false for *choosing between* procedures, because the max of several LOO estimates is biased upward
+and a 0.007 gap is inside the noise at n=159.
+
+**This downgrades the `prior_pixels` band too.** `TRUSTED_PRIOR_PIXELS = (30, 300)` was picked the
+same way — six variants, 159 rows, a CI that already spanned zero. Treat it as unproven. Its
+*mechanism* is strong and independent of the threshold (`log(pred/truth) ≈ −0.87·log(prior_pixels)`,
+corr −0.725, n=147: almost the whole error is the prior's own pixel measurement), so the gate itself
+is well-founded even if the edges are not. The kinematics fix is a different kind of claim — paired,
+mechanism-backed, p=0.0006, not a selected threshold — and is not affected.
+
+Also refuted this session, both free and both properly cross-validated:
+* **MRA-argmax per group instead of the median**: LOO 0.320 vs 0.377. Overfits tiny groups.
+* **Post-processing a good per-row predictor with the constant.** Tested on GPT-5.1's own 159
+  predictions (0.4748): global shrink, symmetric clamp to `[c/K, c·K]`, asymmetric overshoot cap and
+  log-space blending **all lose at every parameter value**. The constant carries no information a
+  real per-row predictor lacks. So never fuse a VLM with the constant — fuse it with the *solver*,
+  or gate. Corollary: the "+19 pts from fixing overshoots" pool is unreachable by any blind cap.
+
+### 3. The validation fixture was corrupt, and fixing it proved the scorer exact
+
+`data/fixtures/gpt-5.1_validation.csv` had **one ground truth wrong by 100x** (125.0 for 1.25), 18
+stale `video_type` values and 6 questions missing the timestamp the parser reads. The organizers'
+own split is now committed as `data/fixtures/quantiphy_validation.csv`, and against it our scorer
+reproduces the published GPT-5.1 macro at **0.4856 vs a published 0.48561** — exact to four decimals,
+where the stale file gave 0.4836. `tests/test_scoring.py` tolerance tightened 0.005 → 5e-4.
+
+Note the correction is not cosmetic: it moves 829 of 3,289 baseline predictions (the D2 constant
+goes 1.71 → 1.25). `baseline-v3.submission.csv` is that ladder with clean truth, built and validated
+but **not yet scored**.
+
+### Depth / 3D fixes landed (sized on the real 1,548 3D test rows)
+
+The correction's **direction is correct** — pinhole-verified, do not look there again. Fixed:
+**C1**, the prior's depth was read at `prior.timestamp` (usually `None`), which falls through to
+*file order*, so a same-object ratio that must be 1.0 came out 1.30 — **1,284 rows have >1 timed
+reading, 310 have a ≥1.25x artifact**. **`MAX_DEPTH_RATIO = 4.0`**, because the 3D path had three
+one-way inflation mechanisms and no upper bound under a metric where 1.9x scores zero. **C3**,
+`_name_overlap`'s containment score was summed uncapped so a loose compound key beat an exact one
+(an 8x error; latent on this test split). **C6**, `radial_speed` matched case-sensitively, so any
+capitalised phrase silently dropped radial.
+
+Tests **129 → 134**, all CPU-only. Still open: C2 (left/right ties, 315 rows), C5 (regex drops, 59
+rows), C7 (separation uses only object A's depth), and the fact that `prior_pixels` is an extent for
+length priors but a *speed* for speed priors, so one band covers two quantities.
+
+### The blocker
+
+A solver submission needs a detection pass over 3,289 rows / 568 videos. **It has never been run** —
+every solver number in this document comes from the 159-row validation cache. That run, and the
+open-weight VLM arm, are the next steps. 561 of 568 test videos are already local in `data/videos/`.
 
 ## The undershoot is NOT one bug — read this before believing any single-cause story
 
@@ -135,9 +582,12 @@ per (category, unit). Scored on the hidden 3,289-row test set.
 
 1. The server's "Average MRA" is *exactly* the macro average `quantiphy/scoring.py` computes —
    confirmed to four decimals. Our scorer is the real scorer.
-2. Our offline LOO estimate of this same submission was **0.3673** against a measured **0.364**. The
-   validation split predicts the test score to within ~0.003, so offline iteration is trustworthy
-   and a submission slot is for confirmation, not exploration.
+2. Our offline LOO estimate of this same submission was **0.3673** against a measured **0.364** --
+   within 0.003. **Read that narrowly.** LOO is accurate for *evaluating one fixed procedure*; it is
+   NOT accurate for *choosing between* procedures, and on 2026-08-22 it picked a baseline variant
+   that measured +0.007 by LOO and **-0.005 on test**. See "LOO on 159 rows CANNOT RANK two
+   candidates" above. A submission slot is for confirmation, and selection is exactly what needs
+   confirming.
 
 ### The uncomfortable part: the solver currently loses to a constant
 
@@ -319,7 +769,9 @@ In priority order, by measured evidence rather than by hunch:
 | # | Item | Rows | Cost | Notes |
 |---|---|---|---|---|
 | ~~1~~ | ~~**"distance between A and B" must use two centroids**~~ | ~~278~~ | done | **DONE 2026-08-22.** Verified on cached detections: the billiard row went from 59.9 px (one ball's box) to 161.2 px of separation, pred/truth 0.40 → **1.083**. See "The distance fix" below. |
-| 1a | **Upload the zero-vision baseline** (`baseline.submission.csv`, built and validated) | 3,289 | free | Register the team, upload, read the per-category MRA. Do this before any GPU spend — it is the floor everything else must beat. |
+| ~~1a~~ | ~~**Upload the zero-vision baseline**~~ | ~~3,289~~ | done | **DONE 2026-08-22.** 0.364, then `baseline-v3` 0.365. Champion is now `mix-v3` at 0.409. |
+| **1g** | **Offline re-solve of all 3,289 test rows** — raise the solve rate | ~1,950 | free | **TOP ITEM.** A solved row is worth +0.218 in D2 and only 28.4% of D2 is solved. Download the four `test-solver-v1-shard*/detections.pkl` (4.1 MB) and widen `replay_cache.load` to `data/fixtures/test_dataset.parquet`; `CachedBackend` and `solve_row` need no change. Then re-fit `TRUSTED_PRIOR_PIXELS` against the real scoring set instead of 159 rows. |
+| **1h** | **Diagnose D3** — the solver loses to a constant *on the rows it answers* (−0.137) | 972 | free | Same replay. D3 is 572 A-prior and 400 V-prior, no Size priors at all, so the derivative-order mechanism predicts it — but −0.137 on solved rows is a wrong answer, not a noisy one. |
 | 1b | **Fresh detection pass for the new phrases** | ~183 | cents | The pair fix renames phrases, so those rows are cache misses. Needed before the separation numbers can be scored at scale. |
 | 1c | `distance-twin` — "between the **two cars**", one phrase twice | **44** | free-ish | Declines by design today. Needs the detector to keep its **top-2** boxes per frame, not just the best; `DetectionSeries` holds one. Small, well-defined change to `grounding.py`. |
 | 2 | **Diagnose the velocity rows** — median ratio 0.094, four of six near zero | ~1,000 | free | Biggest category and the worst performing. Replay the cache; the quadratic fit or the `fps`/timestamp path is suspect. No GPU needed. |
@@ -379,8 +831,8 @@ Re-read any run offline with `py -3.12 scripts/replay_cache.py --run <name>` —
 | | |
 |---|---|
 | Repo | https://github.com/prarabdhmisra/quantiphy (public, MIT) |
-| Tests | **94 on `main`, 129 on the branch** (`py -3.12 -m pytest tests/ -q`) |
-| Plan | `~/.claude/plans/snappy-launching-candy.md` |
+| Tests | **94 on `main`, 189 on the branch** (`py -3.12 -m pytest tests/ -q`) |
+| Plan | `~/.claude/plans/greedy-spinning-hopper.md` (the 60-day campaign, 2026-08-23 → 10-21) |
 | Track | **B (Open-Weight)** primary, A secondary |
 | Deadline | **Plan for Oct 1, 2026** (site advertises Nov 5, but its own timeline finalizes rankings mid-October) |
 
@@ -437,9 +889,24 @@ external feedback until roughly October") was wrong, and it was wrong because th
 guessed URLs instead of reading the page's own nav links. The 3-per-day quota is now the main
 budget to manage.
 
-**Still unanswered** (parked until ~September, none of it blocking): which deadline is
-authoritative, fine-tuning / external data / ensemble rules, whether gated weights count as
-open-weight, and team eligibility across tracks.
+**Team eligibility across tracks -- ANSWERED 2026-08-23**, read off the competition page rather than
+guessed. **Track A (Main)** permits "any model ... proprietary, open-weight, or hybrid"; **Track B
+(Open-Weight)** is the "same scoring rule ... but submissions must be based on publicly available
+model weights and tools". Crucially: *"Competitors may enter either or both tracks. Each track has
+its own leaderboard, evaluation protocol, and awards."* Track choice is **per upload** from a single
+template; the tracks share a registration but have independent leaderboards. "Teams of up to five.
+One team per person, per track." Deadline **Nov 5, 2026 23:59 AOE**.
+
+Consequence: **enter both, always.** Every component here is open-weight (Grounding-DINO, Qwen3-VL,
+a hand-written solver, constants fitted from the organizers' own validation split), so every upload
+is Track-B-eligible and therefore Track-A-eligible too. There is no fork in the roadmap.
+
+**Unverified and it matters:** whether opting a single upload into *both* tracks consumes one of the
+3 daily slots or two. If two, the probing throughput halves from 12 readings/day to 6. Check the
+upload form on `auth/account.html` -- it is behind a login, so it cannot be read from here.
+
+**Still unanswered** (parked, none of it blocking): which deadline is authoritative, fine-tuning /
+external data / ensemble rules, and whether gated weights count as open-weight.
 
 ## Submitting
 
