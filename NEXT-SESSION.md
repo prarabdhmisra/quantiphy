@@ -1,6 +1,6 @@
 # Resume here
 
-Last worked: **2026-08-22**.
+Last worked: **2026-08-24**.
 
 > **THE PORTAL IS LIVE.** The single most important thing on this page. Submissions are scored on
 > upload and return a per-category MRA immediately, 3 per UTC day. Everything below that says
@@ -8,9 +8,9 @@ Last worked: **2026-08-22**.
 > on the board before spending anything on GPU.
 
 > **Where things live.** This document is on both branches and is accurate on both. The *code* from
-> 2026-08-05 and 2026-08-22 is only on **`fix/prior-grounding-phrase`** (pushed, 129 tests green) —
+> 2026-08-05 onward is only on **`fix/prior-grounding-phrase`** (pushed, 189 tests green) —
 > `main` is deliberately still at the last *measured* state, 94 tests. Anything below that names
-> `scripts/replay_cache.py` or 129 tests needs that branch checked out:
+> `scripts/replay_cache.py`, `scripts/select_rows.py` or 189 tests needs that branch checked out:
 >
 > ```bash
 > git checkout fix/prior-grounding-phrase
@@ -20,9 +20,11 @@ Last worked: **2026-08-22**.
 
 > Resuming the QuantiPhy Challenge (NeurIPS 2026) entry. Read
 > `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
-> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (129 tests
+> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (189 tests
 > green). **The submission portal is live and scores on upload, 3/day — read "Submitting" first.**
-> The distance bug is fixed and verified; three single-cause theories of the bias have now been
+> Champion is **`mix-v3`, macro 0.409**. Read "2026-08-24" first: the biggest single gain so far
+> came from noticing where a *declined* row's number comes from, not from any solver change.
+> The distance bug is fixed and verified; four single-cause theories of the bias have now been
 > refuted, so read "The depth hypothesis is also refuted" and "Do not re-derive" before proposing a
 > lever. Don't re-derive anything in those; it cost real money. Ask me before spending more than
 > ~$20 in a session.
@@ -106,12 +108,19 @@ This explains all four category results at once:
 **Useful negatives:** background complexity (C/S/X -> 1.37/1.14/1.55) and single-vs-multi object
 (1.35/1.50) carry almost no signal. Do not spend effort gating on them.
 
-### The lever this opens
+### The lever this opens — SIZED DOWN 2026-08-24, it is small
 
-Gate on **prior type**, a free per-row feature with a mechanical justification -- not a threshold
-fitted on 159 rows. `mix-v1` already handles D3 wholesale via the constant; the finer move is to
-decline **A-prior rows inside the categories the solver won** (D2 is entirely V and A priors). One
-submission tests that in all four categories at once.
+Gating on **prior type** is still free and still mechanically justified, but the version written
+here on 2026-08-23 ("one submission tests that in all four categories at once") was wrong, and the
+row counts say so:
+
+* **S2 is 100% Size-prior and S3 is 566 of 576 Size-prior.** There is nothing to gate in either.
+* **Most A-prior rows already decline.** The solver fires on only **67** A-prior rows in D2 and
+  **148** in D3. Gating them changes 67 rows of 1,160 in D2 — below the point where a category
+  number moves usefully.
+
+So it is a one-category experiment worth a few thousandths, not a four-channel one. Keep it on the
+backlog; do not spend a slot on it while larger pockets are open.
 
 ### Also in that repo, not yet used
 
@@ -122,16 +131,22 @@ submission tests that in all four categories at once.
 * No extra ground truth anywhere: the test parquet has no posterior column, and 159 validation rows
   remain the only truth we will ever have. Checked, so nobody looks again.
 
-## CHAMPION: mix-v1, macro 0.389 — and the composition method is now PROVEN
+## CHAMPION: mix-v3, macro 0.409 — and the composition method is PROVEN
 
 | | S2 | D2 | S3 | D3 | macro |
 |---|---|---|---|---|---|
 | baseline-v3 (constant) | 0.337 | 0.315 | 0.410 | 0.396 | 0.365 |
 | solver-v1 | 0.353 | 0.368 | 0.441 | **0.220** | 0.345 |
-| **mix-v1** (solver S2/D2/S3, constant D3) | **0.353** | **0.368** | **0.441** | **0.396** | **0.389** |
+| mix-v1 (solver S2/D2/S3, constant D3) | 0.353 | 0.368 | 0.441 | 0.396 | 0.389 |
+| mix-v2 (solver only where it solved) | **0.393** | **0.377** | **0.469** | 0.351 | 0.398 |
+| **mix-v3** (mix-v2 on S2/D2/S3, constant D3) | **0.393** | **0.377** | **0.469** | **0.396** | **0.409** |
 
-Predicted 0.3895 from the two parents. Measured **0.389, with all four categories matching to the
-digit.** Build one with `scripts/select_sources.py`.
+`mix-v1` was predicted at 0.3895 from its two parents and measured **0.389, with all four categories
+matching to the digit** — that is the proof. `mix-v3` is therefore *derived, not measured*: 0.4087 is
+arithmetic from numbers the portal already reported, and it cost no slot. Build one with
+`scripts/select_sources.py`.
+
+Note `mix-v2`'s macro (0.398) is **lower** than three of its four channels deserve. Read the columns.
 
 ### The consequence that changes how slots are spent
 
@@ -161,6 +176,91 @@ disagreement check flagged worst: median ratio **3.44** against the constant wit
 above 1.9x, where the other three sat between 0.61 and 1.94. That check has earned some standing.
 Detections for all 3,289 test rows are cached, so diagnosing D3 is free CPU work — and fixing it
 would be worth roughly another +0.04 on the same exact arithmetic.
+
+## 2026-08-24 — where a DECLINED row's number comes from was the biggest lever on the board
+
+Champion **0.389 → 0.409** in one slot plus one free composition. No GPU, no solver change.
+
+### The defect
+
+`make_submission.py`'s fallback ladder fills every unsolved row with the median of **the predictions
+file's own solved values** for that `(category, unit)`. So a solver submission's "zero-vision
+fallback" was never the zero-vision baseline — it is the solver's own overshoot, re-applied to every
+row the solver declined. That is **1,951 of 3,289 rows (59.3%)**, and `mix-v1` carried it on 1,299.
+
+| group | solver-v1 fallback | median of its own solved rows | `baseline-v3` constant |
+|---|---|---|---|
+| `D2\|meters` | 2.7439 | 2.7439 | **1.2500** |
+| `S2\|meters` | 4.7142 | 4.3082 | **2.1250** |
+| `D3\|meters` | 4.6670 | 4.6201 | **1.6593** |
+| `S3\|cm` | 12.8794 | 12.8872 | **49.6900** |
+
+The identity in column 3 is the whole story: the fallback *is* the solver's median. And we already
+had a measured reading that lower was better in the largest group — v1→v3 moved `D2|meters`
+1.71→1.25 and that group's mean score rose `0.004 × 1160/829 = +0.0056`.
+
+**Fixed at the root:** `make_submission.py --fallback-from <predictions>` fills declined rows from a
+named file (e.g. `make_baseline.py`'s output) instead. Rebuilding the test run through it reproduces
+`mix-v2` on all 3,289 rows. The default is unchanged on purpose — flipping it silently would re-date
+every earlier submission.
+
+### What `mix-v2` measured
+
+`mix-v2` = solver on the **1,338 rows where `method != 'none'`**, `baseline-v3`'s constant on the
+other 1,951. Macro 0.398 — and the macro is the least interesting number on the page:
+
+| | S2 | D2 | S3 | D3 |
+|---|---|---|---|---|
+| mix-v1 | 0.353 | 0.368 | 0.441 | **0.396** |
+| mix-v2 | **0.393** | **0.377** | **0.469** | 0.351 |
+
+Three channels won, one lost, so composing the winners gives `mix-v3` at 0.409 for free.
+
+### The solver is now priced, per category, on the rows it actually fires
+
+Inverting each category against `baseline-v3` — `(mix-v2 − constant) × n_C / n_solved`:
+
+| category | solved / total | solver vs constant on those rows |
+|---|---|---|
+| S2 | 247 / 581 | **+0.132** |
+| D2 | 330 / 1160 | **+0.218** |
+| S3 | 441 / 576 | **+0.077** |
+| D3 | 320 / 972 | **−0.137** |
+
+**D3 is not a weak solver, it is a wrong one** — it loses to a constant on the very rows it chose to
+answer. And separately its fallback was doing most of the visible damage: D3 scored 0.220 with the
+run's own fallback, 0.351 with the measured constant, 0.396 with no solver at all.
+
+**The consequence for tomorrow.** A solved row in D2 is worth +0.218 and only 28.4% of D2 is solved.
+The top decline reasons across all 3,289 rows are `gravity prior cannot set pixel scale` (291),
+`separation between two instances of one phrase needs top-2 detections` (44), `prior names no
+groundable object` (37), `prior object not measured` (33), then the `TRUSTED_PRIOR_PIXELS (30, 300)`
+band — which is itself unproven, selected from 6 variants on 159 rows with a CI spanning zero.
+**Raising the solve rate is now worth more than improving any solved row**, and it is free CPU work:
+download the four `test-solver-v1-shard*/detections.pkl` (4.1 MB) and widen `replay_cache.load` to
+`data/fixtures/test_dataset.parquet`. `CachedBackend` and `solve_row` need no change.
+
+### Built today
+
+* `scripts/solved_ids.py` — records which rows a run actually answered, from the shards' own
+  `method` column, into `data/probes/solved-ids-<run>.csv`. A committed artifact rather than a
+  lambda, because the fallback is a single repeated value: a solved row that lands on it is
+  indistinguishable after the fact. **Do not glob the HF cache for shard predictions** — it holds
+  more than one snapshot and returns 5,756 rows from two revisions. Use `merge_shards.py`.
+* `scripts/select_rows.py` — per-**row** source selection, the sibling of `select_sources.py`.
+  Per-*category* composition is arithmetic and never needs a slot; per-*row* is a new source and
+  costs one.
+* `make_submission.py --fallback-from`, above.
+* Tests **176 → 189**, still CPU-only. (The "129" written here on 2026-08-22 was already stale.)
+
+### Slots 2 and 3: a log-symmetric bracket, uploaded 2026-08-24
+
+`probe-d2a` (×0.7) and `probe-d2b` (×1.4) on the largest group in each category of `mix-v3`:
+`S2|meters` 208/581, `D2|meters` 829/1160, `S3|cm` 170/576, `D3|meters` 472/972. With the champion's
+×1.0 already measured, every group ends the day with three points around the incumbent, so any
+adoption is monotone rather than a bet on a half-finished search. Inversion factors — a reported
+shift `d` maps to this much on the group's own mean score: **S2 ×2.79, D2 ×1.40, S3 ×3.39,
+D3 ×2.06.** Results go in `data/probes/ledger.csv`.
 
 ## 2026-08-23 evening — the first solver submission on test, and a units trap
 
@@ -669,7 +769,9 @@ In priority order, by measured evidence rather than by hunch:
 | # | Item | Rows | Cost | Notes |
 |---|---|---|---|---|
 | ~~1~~ | ~~**"distance between A and B" must use two centroids**~~ | ~~278~~ | done | **DONE 2026-08-22.** Verified on cached detections: the billiard row went from 59.9 px (one ball's box) to 161.2 px of separation, pred/truth 0.40 → **1.083**. See "The distance fix" below. |
-| 1a | **Upload the zero-vision baseline** (`baseline.submission.csv`, built and validated) | 3,289 | free | Register the team, upload, read the per-category MRA. Do this before any GPU spend — it is the floor everything else must beat. |
+| ~~1a~~ | ~~**Upload the zero-vision baseline**~~ | ~~3,289~~ | done | **DONE 2026-08-22.** 0.364, then `baseline-v3` 0.365. Champion is now `mix-v3` at 0.409. |
+| **1g** | **Offline re-solve of all 3,289 test rows** — raise the solve rate | ~1,950 | free | **TOP ITEM.** A solved row is worth +0.218 in D2 and only 28.4% of D2 is solved. Download the four `test-solver-v1-shard*/detections.pkl` (4.1 MB) and widen `replay_cache.load` to `data/fixtures/test_dataset.parquet`; `CachedBackend` and `solve_row` need no change. Then re-fit `TRUSTED_PRIOR_PIXELS` against the real scoring set instead of 159 rows. |
+| **1h** | **Diagnose D3** — the solver loses to a constant *on the rows it answers* (−0.137) | 972 | free | Same replay. D3 is 572 A-prior and 400 V-prior, no Size priors at all, so the derivative-order mechanism predicts it — but −0.137 on solved rows is a wrong answer, not a noisy one. |
 | 1b | **Fresh detection pass for the new phrases** | ~183 | cents | The pair fix renames phrases, so those rows are cache misses. Needed before the separation numbers can be scored at scale. |
 | 1c | `distance-twin` — "between the **two cars**", one phrase twice | **44** | free-ish | Declines by design today. Needs the detector to keep its **top-2** boxes per frame, not just the best; `DetectionSeries` holds one. Small, well-defined change to `grounding.py`. |
 | 2 | **Diagnose the velocity rows** — median ratio 0.094, four of six near zero | ~1,000 | free | Biggest category and the worst performing. Replay the cache; the quadratic fit or the `fps`/timestamp path is suspect. No GPU needed. |
@@ -729,8 +831,8 @@ Re-read any run offline with `py -3.12 scripts/replay_cache.py --run <name>` —
 | | |
 |---|---|
 | Repo | https://github.com/prarabdhmisra/quantiphy (public, MIT) |
-| Tests | **94 on `main`, 129 on the branch** (`py -3.12 -m pytest tests/ -q`) |
-| Plan | `~/.claude/plans/snappy-launching-candy.md` |
+| Tests | **94 on `main`, 189 on the branch** (`py -3.12 -m pytest tests/ -q`) |
+| Plan | `~/.claude/plans/greedy-spinning-hopper.md` (the 60-day campaign, 2026-08-23 → 10-21) |
 | Track | **B (Open-Weight)** primary, A secondary |
 | Deadline | **Plan for Oct 1, 2026** (site advertises Nov 5, but its own timeline finalizes rankings mid-October) |
 
