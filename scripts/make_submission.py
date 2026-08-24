@@ -9,8 +9,15 @@ the file we upload is byte-identical to theirs everywhere except the predictions
 `data/fixtures/test_dataset.parquet`. `scripts/run_vision_job.py` keys its output on `row_index`,
 so the join is `id == row_index + 1`.
 
+`--fallback-from` decides what an unsolved row gets. Without it the fallback is the median of
+*this run's own solved values*, which quietly re-applies the solver's bias to every row the solver
+declined -- on 2026-08-23 that put 2.7439 on 830 D2 rows where the validation-derived constant says
+1.2500, and the measured cost was large. Point it at `make_baseline.py`'s output to fill declined
+rows from ground truth instead.
+
 Usage:
-    py -3.12 scripts/make_submission.py predictions.csv --out submission.csv
+    py -3.12 scripts/make_submission.py predictions.csv --out submission.csv \
+        --fallback-from baseline_predictions.csv
 """
 
 from __future__ import annotations
@@ -86,7 +93,25 @@ def fallback_values(template: pd.DataFrame, solved: pd.Series, shrink: float) ->
     return filled.astype(float) * shrink
 
 
-def build(template_path: Path, predictions_path: Path, shrink: float) -> pd.DataFrame:
+def external_fallback(template: pd.DataFrame, path: Path) -> pd.Series:
+    """Per-row fallback values read from a separate predictions file, aligned to the template.
+
+    The point is provenance, not arithmetic. A fallback derived from the run being submitted is a
+    function of that run's own errors; one read from a file fitted on the organizers' validation
+    truth is not. Rows the file leaves blank, zero or negative fall through to the median ladder.
+    """
+    frame = pd.read_csv(path, encoding="utf-8-sig")
+    if "parsed_value" not in frame.columns:
+        raise KeyError(f"{path} is missing the 'parsed_value' column")
+    values = pd.to_numeric(frame["parsed_value"], errors="coerce")
+    values = values.where(values.notna() & (values > 0))
+    by_id = pd.Series(values.to_numpy(), index=prediction_ids(frame).to_numpy())
+    return pd.Series(pd.to_numeric(template["id"]).map(by_id).to_numpy(dtype=float),
+                     index=template.index)
+
+
+def build(template_path: Path, predictions_path: Path, shrink: float,
+          fallback_from: Path | None = None) -> pd.DataFrame:
     template = load_template(template_path)
     predictions = pd.read_csv(predictions_path, encoding="utf-8-sig")
     if "parsed_value" not in predictions.columns:
@@ -109,14 +134,21 @@ def build(template_path: Path, predictions_path: Path, shrink: float) -> pd.Data
     by_id = pd.Series(values.to_numpy(), index=ids.to_numpy())
     solved = pd.Series(valid_ids.map(by_id).to_numpy(dtype=float), index=template.index)
 
-    filled = solved.fillna(fallback_values(template, solved, shrink))
+    ladder = fallback_values(template, solved, shrink)
+    if fallback_from is None:
+        fallback = ladder
+    else:
+        external = external_fallback(template, fallback_from) * shrink
+        fallback = external.fillna(ladder)
+    filled = solved.fillna(fallback)
 
     submission = template.copy()
     submission["parsed_value"] = [VALUE_FORMAT % value for value in filled]
 
     covered = int(solved.notna().sum())
+    source = "this run's own solved median" if fallback_from is None else fallback_from.name
     print(f"{len(submission)} rows | solved {covered} ({100 * covered / len(submission):.1f}%) | "
-          f"fallback {len(submission) - covered}")
+          f"fallback {len(submission) - covered} from {source}")
     for name, group in solved.groupby(category_labels(template)):
         print(f"  {name}: {int(group.notna().sum())}/{len(group)} solved")
     return submission
@@ -129,9 +161,12 @@ def main() -> int:
     parser.add_argument("--template", type=Path, default=TEMPLATE)
     parser.add_argument("--shrink", type=float, default=1.0,
                         help="multiplier on fallback values; <1 trades overshoots for undershoots")
+    parser.add_argument("--fallback-from", type=Path, default=None,
+                        help="predictions file to fill declined rows from, e.g. make_baseline.py's "
+                             "output; without it the fallback is this run's own solved median")
     args = parser.parse_args()
 
-    submission = build(args.template, args.predictions, args.shrink)
+    submission = build(args.template, args.predictions, args.shrink, args.fallback_from)
     submission.to_csv(args.out, index=False, encoding="utf-8")
     print(f"wrote {args.out} ({args.out.stat().st_size / 1e6:.2f} MB)")
     print(f"now run: py -3.12 scripts/validate_submission.py {args.out}")

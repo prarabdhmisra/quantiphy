@@ -192,3 +192,80 @@ def test_validator_rejects_corrupted_submissions(good_submission: Path, tmp_path
     # Assert
     assert problems, "corruption slipped through the validator"
     assert any(expected in problem for problem in problems), problems
+
+
+# --- where a declined row's number comes from ------------------------------------------------
+
+def test_fallback_defaults_to_the_run_s_own_solved_median(tmp_path: Path,
+                                                          predictions: pd.DataFrame) -> None:
+    """The 2026-08-23 defect, pinned: without --fallback-from the run fills its own gaps.
+
+    That is not a neutral choice. It re-applies whatever bias the solver has to every row the
+    solver declined -- 59% of the set on the first real solver submission.
+    """
+    # Arrange
+    path = _write(predictions, tmp_path / "preds.csv")
+
+    # Act
+    values = pd.to_numeric(make_submission.build(TEMPLATE, path, 1.0)["parsed_value"])
+
+    # Assert
+    own = pd.to_numeric(predictions["parsed_value"])
+    solved = set(predictions["row_index"])
+    declined = [index for index in range(len(values)) if index not in solved]
+    filled = values.iloc[declined]
+    # Every fallback is a median of some subset of this run's own values, so it cannot escape their
+    # range, and there is one per (category, unit) group rather than one per row.
+    assert filled.min() >= own.min() and filled.max() <= own.max()
+    assert filled.nunique() <= 40
+
+
+def test_fallback_from_fills_declined_rows_from_the_named_file(tmp_path: Path,
+                                                               template: pd.DataFrame,
+                                                               predictions: pd.DataFrame) -> None:
+    # Arrange
+    path = _write(predictions, tmp_path / "preds.csv")
+    constant = _write(pd.DataFrame({"id": pd.to_numeric(template["id"]), "parsed_value": 7.5}),
+                      tmp_path / "constant.csv")
+
+    # Act
+    values = pd.to_numeric(make_submission.build(TEMPLATE, path, 1.0, constant)["parsed_value"])
+
+    # Assert
+    solved = set(predictions["row_index"])
+    declined = [index for index in range(len(values)) if index not in solved]
+    assert (values.iloc[declined] == 7.5).all()
+    assert (values.iloc[sorted(solved)] != 7.5).all(), "solved rows must keep the solver's value"
+
+
+def test_fallback_from_falls_through_to_the_ladder_where_the_file_is_blank(
+        tmp_path: Path, template: pd.DataFrame, predictions: pd.DataFrame) -> None:
+    """A partial constants file must not leave a hard zero behind."""
+    # Arrange
+    partial = pd.DataFrame({"id": pd.to_numeric(template["id"]), "parsed_value": 7.5})
+    partial.loc[partial.index[1:], "parsed_value"] = 0.0
+    path = _write(predictions, tmp_path / "preds.csv")
+
+    # Act
+    values = pd.to_numeric(make_submission.build(
+        TEMPLATE, path, 1.0, _write(partial, tmp_path / "partial.csv"))["parsed_value"])
+
+    # Assert
+    assert (values > 0).all()
+    assert values.nunique() > 1
+
+
+def test_shrink_applies_to_an_external_fallback_too(tmp_path: Path, template: pd.DataFrame,
+                                                    predictions: pd.DataFrame) -> None:
+    # Arrange
+    path = _write(predictions, tmp_path / "preds.csv")
+    constant = _write(pd.DataFrame({"id": pd.to_numeric(template["id"]), "parsed_value": 7.5}),
+                      tmp_path / "constant.csv")
+
+    # Act
+    values = pd.to_numeric(make_submission.build(TEMPLATE, path, 0.5, constant)["parsed_value"])
+
+    # Assert
+    solved = set(predictions["row_index"])
+    declined = [index for index in range(len(values)) if index not in solved]
+    assert values.iloc[declined].eq(3.75).all()
