@@ -22,7 +22,7 @@ Last worked: **2026-08-24**.
 > `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
 > https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (189 tests
 > green). **The submission portal is live and scores on upload, 3/day — read "Submitting" first.**
-> Champion is **`mix-v3`, macro 0.409**. Read "2026-08-24" first: the biggest single gain so far
+> Champion is **`mix-v4`, macro 0.411**. Read "2026-08-24" first: the biggest single gain so far
 > came from noticing where a *declined* row's number comes from, not from any solver change.
 > The distance bug is fixed and verified; four single-cause theories of the bias have now been
 > refuted, so read "The depth hypothesis is also refuted" and "Do not re-derive" before proposing a
@@ -131,7 +131,7 @@ backlog; do not spend a slot on it while larger pockets are open.
 * No extra ground truth anywhere: the test parquet has no posterior column, and 159 validation rows
   remain the only truth we will ever have. Checked, so nobody looks again.
 
-## CHAMPION: mix-v3, macro 0.409 — and the composition method is PROVEN
+## CHAMPION: mix-v4, macro 0.411 — and the composition method is PROVEN
 
 | | S2 | D2 | S3 | D3 | macro |
 |---|---|---|---|---|---|
@@ -139,12 +139,13 @@ backlog; do not spend a slot on it while larger pockets are open.
 | solver-v1 | 0.353 | 0.368 | 0.441 | **0.220** | 0.345 |
 | mix-v1 (solver S2/D2/S3, constant D3) | 0.353 | 0.368 | 0.441 | 0.396 | 0.389 |
 | mix-v2 (solver only where it solved) | **0.393** | **0.377** | **0.469** | 0.351 | 0.398 |
-| **mix-v3** (mix-v2 on S2/D2/S3, constant D3) | **0.393** | **0.377** | **0.469** | **0.396** | **0.409** |
+| mix-v3 (mix-v2 on S2/D2/S3, constant D3) | 0.393 | 0.377 | 0.469 | 0.396 | 0.409 |
+| **mix-v4** (mix-v3 with `S3\|cm` ×0.7) | **0.393** | **0.377** | **0.477** | **0.396** | **0.411** |
 
 `mix-v1` was predicted at 0.3895 from its two parents and measured **0.389, with all four categories
-matching to the digit** — that is the proof. `mix-v3` is therefore *derived, not measured*: 0.4087 is
-arithmetic from numbers the portal already reported, and it cost no slot. Build one with
-`scripts/select_sources.py`.
+matching to the digit** — that is the proof. `mix-v3` and `mix-v4` are therefore *derived, not measured*: their
+macros are arithmetic from numbers the portal already reported, and they cost no slot. Build one
+with `scripts/select_sources.py`.
 
 Note `mix-v2`'s macro (0.398) is **lower** than three of its four channels deserve. Read the columns.
 
@@ -253,14 +254,39 @@ download the four `test-solver-v1-shard*/detections.pkl` (4.1 MB) and widen `rep
 * `make_submission.py --fallback-from`, above.
 * Tests **176 → 189**, still CPU-only. (The "129" written here on 2026-08-22 was already stale.)
 
-### Slots 2 and 3: a log-symmetric bracket, uploaded 2026-08-24
+### Slots 2 and 3: the bracket, and what it says — the incumbents were already near-optimal
 
 `probe-d2a` (×0.7) and `probe-d2b` (×1.4) on the largest group in each category of `mix-v3`:
 `S2|meters` 208/581, `D2|meters` 829/1160, `S3|cm` 170/576, `D3|meters` 472/972. With the champion's
-×1.0 already measured, every group ends the day with three points around the incumbent, so any
-adoption is monotone rather than a bet on a half-finished search. Inversion factors — a reported
-shift `d` maps to this much on the group's own mean score: **S2 ×2.79, D2 ×1.40, S3 ×3.39,
-D3 ×2.06.** Results go in `data/probes/ledger.csv`.
+×1.0 already measured, every group got three points around the incumbent, so the argmax is monotone
+by construction rather than a bet on a half-finished search.
+
+| group | ×0.7 | ×1.0 | ×1.4 | argmax | on the group's own mean |
+|---|---|---|---|---|---|
+| `S2\|meters` | 0.389 | **0.393** | 0.368 | ×1.0 | −0.011 / — / −0.070 |
+| `D2\|meters` | 0.358 | **0.377** | 0.324 | ×1.0 | −0.027 / — / −0.074 |
+| **`S3\|cm`** | **0.477** | 0.469 | 0.430 | **×0.7** | **+0.027** / — / −0.132 |
+| `D3\|meters` | 0.383 | **0.396** | 0.366 | ×1.0 | −0.027 / — / −0.062 |
+
+**Three of four constants were already sited well**, which is a real result: the `(category, unit)`
+medians fitted on 159 validation rows transfer to the 3,289-row scoring set better than the
+0.459-in-sample / 0.365-on-test gap suggested. The gap is estimation error in the *small* groups,
+not a systematic mis-siting of the large ones.
+
+**Every group loses more at ×1.4 than it loses at ×0.7** — the response curve is asymmetric in
+exactly the direction the metric predicts. Overshoot is fatal, undershoot is cheap. When a future
+bracket has to be one-sided for want of slots, make it the low side.
+
+`S3|cm` at ×0.7 is adopted → **`mix-v4`, 0.411**. The argmax sits on the edge of the bracket, so the
+true optimum may be lower still: **refine `S3|cm` at ×0.5 and ×0.35 next.** Inversion factors for
+re-use — a reported shift `d` maps to this much on the group's own mean score: **S2 ×2.79,
+D2 ×1.40, S3 ×3.39, D3 ×2.06.**
+
+### Day 2 close: 0.389 → 0.411 on three slots, no GPU
+
+Slot 1 bought +0.020 (the fallback defect), slots 2–3 bought +0.002 (one constant re-sited) and,
+more usefully, **retired the "the constants are badly placed" hypothesis for the three largest
+groups.** Next day's slots should go to the solve rate, not to more scale probes on those three.
 
 ## 2026-08-23 evening — the first solver submission on test, and a units trap
 
