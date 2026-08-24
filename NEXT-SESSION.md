@@ -24,10 +24,70 @@ Last worked: **2026-08-24**.
 > green). **The submission portal is live and scores on upload, 3/day — read "Submitting" first.**
 > Champion is **`mix-v4`, macro 0.411**. Read "2026-08-24" first: the biggest single gain so far
 > came from noticing where a *declined* row's number comes from, not from any solver change.
+> **Today's agreed task is the offline re-solve — see "DAY 3: the offline re-solve" and just do it.**
+> It is free CPU work, the recipe is written out step by step, and it does not need a slot.
 > The distance bug is fixed and verified; four single-cause theories of the bias have now been
 > refuted, so read "The depth hypothesis is also refuted" and "Do not re-derive" before proposing a
 > lever. Don't re-derive anything in those; it cost real money. Ask me before spending more than
 > ~$20 in a session.
+
+## DAY 3: the offline re-solve — agreed with Prarabdh on 2026-08-24, do this first
+
+**Why this and not more probing.** Slots 2 and 3 on Day 2 showed the constants for the three largest
+groups are already sited well, so more scale probes there are near-worthless. Meanwhile `mix-v2`
+priced a *solved* row at **+0.218 in D2**, and only **28.4%** of D2 is solved. The pocket is the
+1,951 declined rows, not the 1,338 solved ones. Costs **$0** and **no slot**.
+
+### The blocker is one function
+
+`scripts/replay_cache.py:load(repo, run, limit)` hardcodes the 159-row validation split and a single
+`detections.pkl`. It needs to (a) read `data/fixtures/test_dataset.parquet` instead, and (b) merge
+the four shard pickles. **`CachedBackend` and `solve_row` need no change at all** — a replay runs the
+identical measurement code the GPU run did, on CPU, in seconds.
+
+* The four pickles are on the Hub, **not yet downloaded**, ~4.1 MB total:
+  `prarabdhmisra/quantiphy-runs` → `test-solver-v1-shard{1..4}/detections.pkl`.
+  Pull them with `hf_hub_download(repo, repo_type="dataset", filename=...)`, the way
+  `scripts/merge_shards.py:load_shards` already does.
+* Keys are `(video path, phrase)`, so the four dicts **union cleanly** with `dict.update`.
+* `scripts/run_vision_job.py:load_split("test")` already shows the exact test-frame construction to
+  copy — reuse it rather than rebuilding the row→request path.
+* **Detections are cached per `(video, phrase)`.** Any parsing change that renames a phrase shows up
+  as a cache *miss*, not a new number. So phrase-renaming fixes cannot be evaluated this way; they
+  need a fresh detection pass. The script says so loudly — believe it.
+
+### Then, in order
+
+1. **Reproduce `solver-v1` exactly** from the replay before changing anything. Success criterion:
+   1,338 solved, and the per-category solve rates S2 42.5% / D2 28.4% / S3 76.6% / D3 32.9%. If the
+   replay does not reproduce them, stop — the harness is wrong, not the solver.
+2. **Attack the decline reasons, largest first.** Counted over all 3,289 test rows:
+   `gravity prior cannot set pixel scale` **291**, `separation between two instances of one phrase
+   needs top-2 detections` **44**, `prior names no groundable object` **37**,
+   `prior object not measured: object never detected` **33**, then the `TRUSTED_PRIOR_PIXELS` band.
+3. **Re-fit `TRUSTED_PRIOR_PIXELS = (30.0, 300.0)`** against the real scoring set. It was selected
+   from 6 variants on 159 rows with a CI spanning zero — the mechanism is solid (corr −0.725,
+   n=147), the edges are not.
+4. **Diagnose D3 while you are in there.** The solver loses to a constant by **−0.137 on the rows it
+   chose to answer**. That is a wrong answer, not a noisy one, and D3 is 972 rows.
+
+### How to judge the result without spending a slot
+
+You cannot score a replay — there is no test truth. What the replay gives you is the **solve rate**
+and the *identity* of newly solved rows. Ship a new solver submission only when it solves strictly
+more rows, and build it with:
+
+```bash
+py -3.12 scripts/make_submission.py <preds> --out solver-v2.submission.csv     --fallback-from baseline_predictions.csv      # NEVER omit this -- see 2026-08-24
+py -3.12 scripts/solved_ids.py --run <run> --shards 4 --out data/probes/solved-ids-<run>.csv
+```
+
+Then one slot measures it in all four categories at once, and the winners compose offline for free.
+
+### Also worth one slot that day
+
+Refine **`S3|cm` at ×0.5**. Day 2's argmax sat on the edge of the ×0.7 bracket, so the optimum may
+be lower. Everything else in that submission should stay at the champion.
 
 ## The paper (arXiv 2512.19526) — three things that change the roadmap
 
