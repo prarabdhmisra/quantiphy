@@ -141,6 +141,56 @@ safe to try — a category that regresses just keeps `mix-v4`'s source.
 built through the `--trusted-prior-pixels` flag, so nothing in the solver changed on an unmeasured
 result. Change the default only once a slot has spoken.
 
+### D3 diagnosed: the derivative order predicts it, and it is an OVERSHOOT
+
+Item 1h, done on the same replay. `video_type[0]` is the prior's physical type (S = Size,
+V = Velocity, A = Acceleration), so it *is* the derivative order. Median solver answer as a multiple
+of the constant, over solved rows:
+
+| prior | S2 | D2 | S3 | D3 |
+|---|---|---|---|---|
+| Size (0 derivatives) | 1.39 (n=247) | 0.58 (n=14) | 0.60 (n=431) | — |
+| Velocity (1) | — | 1.64 (n=249) | 1.40 (n=10) | **2.70 (n=172)** |
+| Acceleration (2) | — | 2.55 (n=67) | — | **3.79 (n=148)** |
+
+D3 has **no Size priors at all** — 572 A-prior and 400 V-prior — and the ratio climbs monotonically
+with derivative order. So D3's 0.220 is not noise: the solver overshoots the constant by ~3x there,
+and **overshoot is fatal under MRA** while undershoot is cheap. That reconciles two numbers that
+looked contradictory: the solver "loses to a constant by −0.137 on the rows it answers" *because* a
+3x overshoot scores approximately zero, not because the measurements are random.
+
+### The actual defect is `geometric-3d` on LENGTH questions — 277 rows, wrong in both directions
+
+Item 1e, localized. Splitting `geometric-3d`'s solved rows by question dimension:
+
+| cat | dimension | radial | n | median × const | >10× off |
+|---|---|---|---|---|---|
+| S3 | speed | yes | 91 | **0.99** | **1.1%** |
+| D3 | speed | yes | 35 | **1.16** | **0.0%** |
+| S3 | speed | no | 44 | 0.54 | 4.5% |
+| **S3** | **length** | no | **141** | **0.26** | **9.9%** |
+| **D3** | **length** | no | **136** | **5.69** | **30.9%** |
+| S3 | acceleration | no | 7 | 0.29 | 14.3% |
+
+Two separable conclusions, and the earlier "geometric-3d is actively harmful" was too broad:
+
+1. **3D speed is healthy.** With the radial component it is essentially unbiased (0.99 and 1.16) and
+   almost never wildly off. And the radial correction is doing real work: the same category without
+   it sits at 0.54. `radial_speed` needs **two timed depth readings** for the object, so it fires on
+   only 126 of 454 `geometric-3d` rows. Widening where it can fire is a real, bounded lever.
+2. **3D length is the bug.** 277 solved rows, off by ~4x — and in *opposite directions* between S3
+   (0.26, a 4x undershoot) and D3 (5.69, a 5.7x overshoot). One code path being wrong by a similar
+   factor in opposite directions across two categories is the signature of a **ratio applied the
+   wrong way round**, which is exactly the standing suspicion in item 1e: `depth_for` matching the
+   wrong reading so the perspective correction inverts. Read `geometry.solve`'s
+   `target_depth_m`/`prior_depth_m` ordering against `solver.py:167-170` first.
+
+**Caveat on the instrument.** These ratios are against the fallback constant, not truth — there is
+no test truth. In D3 the constant *beats* the solver (0.396 vs 0.220), so "far from the constant" is
+genuinely bad there; in S3 the solver beats it (0.441 vs 0.410), so the S3 column is weaker
+evidence on its own. The opposite-signed 4x in one code path is the finding, and it does not depend
+on which reference is better.
+
 ## DAY 3: the offline re-solve — the plan, kept for its reasoning (DONE 2026-08-25)
 
 **Why this and not more probing.** Slots 2 and 3 on Day 2 showed the constants for the three largest
@@ -970,12 +1020,13 @@ In priority order, by measured evidence rather than by hunch:
 | **1i** | **Upload `solver-v2.submission.csv`** — band `(30, inf)`, 2,585 solved vs 1,338 | 3,289 | **1 slot** | **TOP ITEM, and it needs nothing built.** The file is on disk and validates. One slot scores all four categories; the winners then compose against `mix-v4` offline and exactly. Then, and only then, change `TRUSTED_PRIOR_PIXELS` in `solver.py`. |
 | **1j** | **Per-category lower edge on the band** | ~74 | free + 1 slot | Below 30 px, S2 (n=29) and S3 (n=45) have **zero** rows >100x off, while D2 (n=93) and D3 (n=97) are 46%/57% off. A lower edge of 30 for D2/D3 and ~0 for S2/S3 recovers 74 rows. Replay it; do not spend a slot until 1i has landed. |
 | **1k** | **The gravity prior** — `cannot set pixel scale` | **291** | free to try | Now the largest *remaining* bucket, and all of it is D2 (170) and D3 (121) — the two categories the paper says are our whole gap. A gravity prior gives `g = 9.81 m/s²` with no pixel length, so scale must come from the target's own kinematics; that is a solver change, then a replay. |
-| **1h** | **Diagnose D3** — the solver loses to a constant *on the rows it answers* (−0.137) | 972 | free | **Still open, and now cheap:** the replay emits `prior_pixels`/`target_pixels` per row, so the decomposition that found the 2.4x undershoot on validation can be run on all 972 D3 rows. D3 is 572 A-prior and 400 V-prior, no Size priors at all, so the derivative-order mechanism predicts it — but −0.137 on solved rows is a wrong answer, not a noisy one. |
+| ~~1h~~ | ~~**Diagnose D3**~~ | ~~972~~ | done | **DONE 2026-08-25.** It is a ~3x *overshoot* rising monotonically with the prior's derivative order, and overshoot scores zero. The fixable part is item 1e. See "D3 diagnosed". |
 | 1b | **Fresh detection pass for the new phrases** | ~183 | cents | The pair fix renames phrases, so those rows are cache misses. Needed before the separation numbers can be scored at scale. |
 | 1c | `distance-twin` — "between the **two cars**", one phrase twice | **44** | free-ish | Declines by design today. Needs the detector to keep its **top-2** boxes per frame, not just the best; `DetectionSeries` holds one. Small, well-defined change to `grounding.py`. |
 | 2 | **Diagnose the velocity rows** — median ratio 0.094, four of six near zero | ~1,000 | free | Biggest category and the worst performing. Replay the cache; the quadratic fit or the `fps`/timestamp path is suspect. No GPU needed. |
 | ~~1d~~ | ~~**CONFIDENCE GATING**~~ | — | done | **REFUTED 2026-08-22 on 159 rows.** Every threshold scores below the constant; detector confidence does not predict correctness. See "The confidence gate is REFUTED". |
-| **1e** | **Diagnose `geometric-3d`** — every 3D route loses to a constant (0.315 vs 0.500), and S3+D3 are **half** the score | ~1,548 | free | Now the best lead. Suspicion: `depth_for` matches the wrong reading, so the correction is applied backwards. Replay `validation-distance-fix1` — no GPU. |
+| **1e** | **Fix `geometric-3d` on LENGTH questions** — 277 rows off by ~4x in *opposite* directions (S3 0.26, D3 5.69) | **277** | free | **Diagnosed 2026-08-25, and narrowed: 3D *speed* is healthy (0.99/1.16 with radial), so this is the length path only.** Opposite-signed error in one path says a ratio is inverted — check `geometry.solve`'s `target_depth_m`/`prior_depth_m` against `solver.py:167-170`. Replay to verify; no GPU. |
+| **1l** | **Widen where the radial correction can fire** | ~328 | free | `radial_speed` needs two timed depth readings, so it fires on only 126 of 454 `geometric-3d` rows — and where it fires the route is unbiased (0.99/1.16) against 0.54 where it does not. |
 | 1f | Confirm-or-kill the 1.5x disagreement gate on the test set | all | 1 slot + test run | +0.013 with CI [+0.0013,+0.0252], but it survived ~20 variants on 159 rows. Treat as unproven until a real submission says otherwise. |
 | 3 | Kill the fatal overshoots: gate on prior confidence | — | free | The `pedestrian walking` prior scored 0.341 with box width jittering 13–59 px and produced 7x overshoots. `min_confidence` already exists and is unused (`solve_row` defaults it to 0.0). Now that `detection_rate` is fixed, confidence is finally meaningful. |
 | 4 | Decide on `fix/prior-grounding-phrase` | 412 | free | Real defects, 114 tests green, but it did **not** move the metric. Merge on correctness grounds, not on a score claim. |
