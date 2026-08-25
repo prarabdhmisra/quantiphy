@@ -11,6 +11,8 @@ detections*
 data/runs/
 submissions/
 *.submission.csv
+baseline_predictions.csv
+replay-*.csv
 
 # Python
 __pycache__/

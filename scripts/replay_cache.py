@@ -10,12 +10,25 @@ the ``prior_pixels`` value that *would* have produced the truth. When that colum
 multiple of what we measured, the error is in the prior's pixel measurement and nothing else --
 which is a very different bug from a noisy detector, and is fixed in a different file.
 
+Two splits, and they answer different questions. Validation has ground truth, so it prints the
+per-row ratio table above. The test split has none, so it prints solve rates instead -- and the
+solve rate is a real instrument, because a solved row was measured at **+0.218 in D2** against the
+fallback constant. Judge a change on the test split by whether it solves strictly more rows, then
+buy one submission slot to find out what they were worth.
+
+A test replay always checks itself against ``SOLVER_V1`` first. That gate is the harness's only
+claim to authority -- same code, same detections, so a disagreement means the harness is broken, not
+the solver -- and it exits non-zero rather than printing solve rates that could justify a slot.
+
 Usage:
     py -3.12 scripts/replay_cache.py [--limit 20] [--run validation-grounding]
+    py -3.12 scripts/replay_cache.py --split test --run test-solver-v1 --shards 4 \
+        [--trusted-prior-pixels 30,inf] [--out predictions.csv]
 
 Detections are cached per ``(video path, phrase)``. **Changing an object phrase changes the key**,
 so a parsing fix that renames phrases shows up here as cache misses, not as new numbers. That is the
 correct signal: those rows need a fresh (cheap) detection pass before they can be measured again.
+An *empty* cached series is not a miss -- the detector ran and found nothing, which is an answer.
 """
 
 from __future__ import annotations
@@ -44,6 +57,13 @@ from quantiphy.vision import PixelMeasurement  # noqa: E402
 
 DEFAULT_REPO = "prarabdhmisra/quantiphy-runs"
 VALIDATION = "PaulineLi/QuantiPhy-validation"
+TEST_PARQUET = ROOT / "data" / "fixtures" / "test_dataset.parquet"
+
+#: What ``test-solver-v1`` measured on the GPU, read off its own ``predictions.csv``. A test replay
+#: runs the identical measurement code against the identical detections, so it must reproduce these
+#: exactly before any change to the solver is believed. A mismatch means the harness is wrong, not
+#: the solver -- so this is asserted loudly rather than printed for eyeballing.
+SOLVER_V1 = {"solved": 1338, "S2": 0.42513, "D2": 0.28448, "S3": 0.76562, "D3": 0.32922}
 
 
 class CachedBackend:
@@ -72,6 +92,14 @@ class CachedBackend:
             self.misses.append(key)
             return PixelMeasurement(object_name=object_name, note="not in the detection cache")
 
+        if series.times.size == 0:
+            # An empty series is a *cached* answer -- the detector ran and found nothing -- so it is
+            # not a miss. Mirroring the real backend's note matters because the decline-reason
+            # histogram is what the next fix is chosen from, and without this the 41 "object never
+            # detected" rows arrive as an empty reason and vanish into the tail.
+            return PixelMeasurement(object_name=object_name, frames_tracked=0,
+                                    note="object never detected")
+
         confidence = series.mean_score * series.detection_rate
         tracked = int(series.times.size)
         if dimension == "length":
@@ -90,28 +118,219 @@ class CachedBackend:
         )
 
 
-def load(repo: str, run: str, limit: int) -> tuple[pd.DataFrame, dict]:
+def load_detections(repo: str, run: str, shards: int) -> dict:
+    """The run's detection cache, unioned across its shards.
+
+    A sharded run partitions *rows*, so each shard's cache holds only the ``(video, phrase)`` pairs
+    its own slice needed. The keys are the pair itself, so the dicts union cleanly -- and where two
+    shards saw the same video the entries are identical measurements of identical frames, so which
+    one wins does not matter. ``shards=0`` means an unsharded run with one cache at
+    ``<run>/detections.pkl``.
+    """
+    from huggingface_hub import hf_hub_download
+
+    names = [run] if shards == 0 else [f"{run}-shard{index}" for index in range(1, shards + 1)]
+    cache: dict = {}
+    for name in names:
+        path = hf_hub_download(repo, repo_type="dataset", filename=f"{name}/detections.pkl")
+        with open(path, "rb") as handle:
+            piece = pickle.load(handle)
+        overlap = len(set(piece) & set(cache))
+        print(f"  {name}: {len(piece)} pairs" + (f" ({overlap} already seen)" if overlap else ""))
+        cache.update(piece)
+    return cache
+
+
+def load(repo: str, run: str, limit: int, split: str = "validation",
+         shards: int = 0) -> tuple[pd.DataFrame, dict]:
+    """The rows to replay, and the detections to replay them against.
+
+    The test split is read from the *local* pinned parquet rather than through
+    ``snapshot_download("PaulineLi/QuantiPhy")``, which would pull every video -- gigabytes -- to
+    answer a question that needs no pixels at all. No video is opened here; only their basenames,
+    as cache keys.
+    """
+    if split == "test":
+        if not TEST_PARQUET.exists():
+            raise SystemExit(f"{TEST_PARQUET} is missing; the test split cannot be replayed")
+        frame = pd.read_parquet(TEST_PARQUET).reset_index(drop=True)
+        if limit:
+            frame = frame.head(limit)
+        return frame, load_detections(repo, run, shards)
+
     from huggingface_hub import hf_hub_download
 
     csv = hf_hub_download(VALIDATION, repo_type="dataset", filename="validation_dataset.csv")
     frame = pd.read_csv(csv, encoding="utf-8-sig")
     frame = frame[frame["ground_truth_posterior"].notna()].reset_index(drop=True).head(limit)
+    return frame, load_detections(repo, run, shards)
 
-    pkl = hf_hub_download(repo, repo_type="dataset", filename=f"{run}/detections.pkl")
-    with open(pkl, "rb") as handle:
-        return frame, pickle.load(handle)
+
+def replay(frame: pd.DataFrame, backend: CachedBackend, **kwargs) -> pd.DataFrame:
+    """Re-solve every row, one record each, in ``run_vision_job.py``'s prediction schema.
+
+    A row that raises is recorded as declined with the exception as its reason, exactly as the GPU
+    job does. That matters more here than there: the point of a replay is a *complete* comparison
+    against the run it reproduces, and one raised row aborting the pass looks like a harness bug
+    when it is a solver bug on a single input.
+    """
+    records = []
+    for row_index, row in frame.iterrows():
+        try:
+            request = build_request(row)
+            # Only the basename is used, as a cache key -- no file is opened.
+            answer = solve_row(request, backend, f"cache/{row['video_id']}.mp4", **kwargs)
+            value = answer.value if answer.solved else None
+            method, reason = answer.method, answer.reason
+            confidence = answer.confidence
+            prior_px, target_px = answer.prior_pixels, answer.target_pixels
+        except Exception as error:                                     # noqa: BLE001
+            value, method, reason = None, "none", f"{type(error).__name__}: {error}"
+            confidence = prior_px = target_px = float("nan")
+
+        records.append({
+            "row_index": row_index,
+            "video_id": row["video_id"],
+            "question": row["question"],
+            "video_type": row["video_type"],
+            "inference_type": row["inference_type"],
+            "parsed_value": value,
+            "method": method,
+            "reason": reason,
+            "confidence": confidence,
+            # Not in the GPU schema, and the whole reason a replay beats reading predictions.csv:
+            # these are what the TRUSTED_PRIOR_PIXELS band gets re-fitted against.
+            "prior_pixels": prior_px,
+            "target_pixels": target_px,
+        })
+    return pd.DataFrame(records)
+
+
+def report(results: pd.DataFrame) -> None:
+    """Solve rate overall and per scored category, then the decline reasons that dominate.
+
+    There is no ground truth for the test split, so a replay cannot be scored -- the solve rate and
+    the *identity* of newly solved rows is the entire signal. Judge a change by whether it solves
+    strictly more rows, then spend one submission slot to find out what they were worth.
+    """
+    from quantiphy.scoring import CATEGORIES, category_labels
+
+    solved = results["parsed_value"].notna()
+    print(f"\nsolved {int(solved.sum())}/{len(results)} ({solved.mean():.1%})")
+
+    labels = category_labels(results)
+    print(f"\n{'cat':>4} {'rows':>6} {'solved':>7} {'rate':>9}  {'solver-v1':>9} {'delta':>8}")
+    for category in CATEGORIES:
+        rows = labels == category
+        if not rows.any():
+            continue
+        rate = solved[rows].mean()
+        was = SOLVER_V1[category]
+        print(f"{category:>4} {int(rows.sum()):6d} {int(solved[rows].sum()):7d} {rate:9.3%}  "
+              f"{was:9.3%} {rate - was:+8.3%}")
+
+    declines = results.loc[~solved, "reason"].value_counts()
+    print(f"\ntop decline reasons ({len(declines)} distinct over {int((~solved).sum())} rows):")
+    for reason, count in declines.head(10).items():
+        print(f"  {count:5d}  {reason}")
+
+
+def check_reproduction(results: pd.DataFrame) -> bool:
+    """Did the replay reproduce ``solver-v1``? Print the verdict, and return it.
+
+    Deliberately a hard gate rather than a note. The replay's only claim to authority is that it is
+    the same code on the same detections, so if it disagrees with the run it reproduces then every
+    number it prints is unfounded -- including the ones that would justify spending a slot.
+    """
+    from quantiphy.scoring import CATEGORIES, category_labels
+
+    solved = results["parsed_value"].notna()
+    labels = category_labels(results)
+    problems = []
+    if int(solved.sum()) != SOLVER_V1["solved"]:
+        problems.append(f"solved {int(solved.sum())}, expected {SOLVER_V1['solved']}")
+    for category in CATEGORIES:
+        rows = labels == category
+        # 0.0005 is half of the last recorded digit, not an allowance for drift: the replay is
+        # deterministic, so anything past rounding is a real difference and must fail.
+        if rows.any() and abs(solved[rows].mean() - SOLVER_V1[category]) > 0.0005:
+            problems.append(f"{category} {solved[rows].mean():.3%} vs {SOLVER_V1[category]:.3%}")
+
+    if problems:
+        print("\nDOES NOT REPRODUCE solver-v1: " + "; ".join(problems))
+        print("The harness is wrong, not the solver -- fix that before believing anything above.")
+        return False
+    print(f"\nreproduces solver-v1 exactly ({SOLVER_V1['solved']} solved, all four rates match)")
+    return True
+
+
+def band(text: str) -> tuple[float, float]:
+    """Parse ``--trusted-prior-pixels lo,hi``; ``inf`` is accepted, and so is ``0,inf``."""
+    try:
+        low, high = (float(part) for part in text.split(","))
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected 'low,high', got {text!r}") from None
+    if not low <= high:
+        raise argparse.ArgumentTypeError(f"low must not exceed high, got {low} > {high}")
+    return low, high
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--limit", type=int, default=20, help="validation rows to replay")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="rows to replay; 0 means all. Defaults to 20 on validation (the smoke "
+                             "run's size) and to all 3,289 on test")
     parser.add_argument("--run", default="validation-grounding", help="run folder in the repo")
     parser.add_argument("--repo", default=os.environ.get("OUTPUT_REPO", DEFAULT_REPO))
+    parser.add_argument("--split", choices=("validation", "test"), default="validation",
+                        help="validation has ground truth and prints per-row ratios; test has "
+                             "none, so it prints solve rates and decline reasons instead")
+    parser.add_argument("--shards", type=int, default=0,
+                        help="shard count of a sharded run; 0 for a single detections.pkl")
+    parser.add_argument("--trusted-prior-pixels", type=band, default=None, metavar="LOW,HIGH",
+                        help="override solver.TRUSTED_PRIOR_PIXELS for this replay -- this is how "
+                             "the band is re-fitted without editing the solver")
+    parser.add_argument("--out", type=Path, default=None,
+                        help="write the replayed predictions here, in run_vision_job.py's schema, "
+                             "so make_submission.py can consume them directly")
     args = parser.parse_args()
 
-    frame, cache = load(args.repo, args.run, args.limit)
+    # A test replay defaults to every row: an arbitrary first-20 slice says nothing about a solve
+    # rate -- and it silently *looks* like an answer, which is worse than a slow pass. All 3,289
+    # cost seconds.
+    limit = args.limit if args.limit is not None else (20 if args.split == "validation" else 0)
+    kwargs = ({"trusted_prior_pixels": args.trusted_prior_pixels}
+              if args.trusted_prior_pixels is not None else {})
+
+    frame, cache = load(args.repo, args.run, limit, args.split, args.shards)
     backend = CachedBackend(cache)
     print(f"{len(cache)} cached (video, phrase) pairs; replaying {len(frame)} rows\n")
+
+    if args.split == "test":
+        results = replay(frame, backend, **kwargs)
+        report(results)
+        reproduced = check_reproduction(results) if not kwargs else None
+        if reproduced is None:
+            print("(reproduction not checked: the solver was overridden for this replay)")
+
+        if backend.misses:
+            unique = sorted(set(backend.misses))
+            print(f"\n{len(backend.misses)} cache misses over {len(unique)} distinct keys -- "
+                  f"those rows were NOT measured. A renamed phrase lands here, not in the numbers "
+                  f"above, and needs a fresh detection pass.")
+            for video, phrase in unique[:10]:
+                print(f"    {video}  {phrase!r}")
+            if len(unique) > 10:
+                print(f"    ... and {len(unique) - 10} more")
+
+        if args.out:
+            results.to_csv(args.out, index=False, encoding="utf-8")
+            print(f"\n-> {args.out}")
+            print(f"now: py -3.12 scripts/make_submission.py {args.out} "
+                  f"--out solver-v2.submission.csv --fallback-from baseline_predictions.csv")
+        # A replay that does not reproduce its own run is a broken harness, and exiting 0 would let
+        # it feed a submission.
+        return 0 if reproduced is not False else 1
 
     header = (f"{'#':>2} {'ratio':>7} {'pred':>10} {'truth':>10} {'prior_px':>9} "
               f"{'needed':>9} {'x':>6} {'target_px':>10}  prior -> target")
