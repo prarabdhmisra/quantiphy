@@ -1,6 +1,6 @@
 # Resume here
 
-Last worked: **2026-08-24**.
+Last worked: **2026-08-25**.
 
 > **THE PORTAL IS LIVE.** The single most important thing on this page. Submissions are scored on
 > upload and return a per-category MRA immediately, 3 per UTC day. Everything below that says
@@ -8,9 +8,9 @@ Last worked: **2026-08-24**.
 > on the board before spending anything on GPU.
 
 > **Where things live.** This document is on both branches and is accurate on both. The *code* from
-> 2026-08-05 onward is only on **`fix/prior-grounding-phrase`** (pushed, 189 tests green) —
+> 2026-08-05 onward is only on **`fix/prior-grounding-phrase`** (pushed, 206 tests green) —
 > `main` is deliberately still at the last *measured* state, 94 tests. Anything below that names
-> `scripts/replay_cache.py`, `scripts/select_rows.py` or 189 tests needs that branch checked out:
+> `scripts/replay_cache.py`, `scripts/select_rows.py` or 206 tests needs that branch checked out:
 >
 > ```bash
 > git checkout fix/prior-grounding-phrase
@@ -20,18 +20,128 @@ Last worked: **2026-08-24**.
 
 > Resuming the QuantiPhy Challenge (NeurIPS 2026) entry. Read
 > `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
-> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (189 tests
+> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (206 tests
 > green). **The submission portal is live and scores on upload, 3/day — read "Submitting" first.**
-> Champion is **`mix-v4`, macro 0.411**. Read "2026-08-24" first: the biggest single gain so far
-> came from noticing where a *declined* row's number comes from, not from any solver change.
-> **Today's agreed task is the offline re-solve — see "DAY 3: the offline re-solve" and just do it.**
-> It is free CPU work, the recipe is written out step by step, and it does not need a slot.
-> The distance bug is fixed and verified; four single-cause theories of the bias have now been
-> refuted, so read "The depth hypothesis is also refuted" and "Do not re-derive" before proposing a
-> lever. Don't re-derive anything in those; it cost real money. Ask me before spending more than
-> ~$20 in a session.
+> Champion is **`mix-v4`, macro 0.411**. **`solver-v2.submission.csv` is built, validated and
+> UNSUBMITTED — uploading it is the first thing to do, and it is the whole point of yesterday's
+> work.** Read "2026-08-25" first: the offline replay harness exists now, it reproduces the GPU run
+> exactly, and it found that `TRUSTED_PRIOR_PIXELS` — not the gravity prior — causes 77% of all
+> declines. Everything downstream of detection is now free to measure, so *replay before proposing*.
+> Four single-cause theories of the bias have been refuted, so read "The depth hypothesis is also
+> refuted" and "Do not re-derive" before proposing a lever; it cost real money. Ask me before
+> spending more than ~$20 in a session.
 
-## DAY 3: the offline re-solve — agreed with Prarabdh on 2026-08-24, do this first
+## 2026-08-25 — the replay harness is built, and the band is 77% of all declines
+
+**The whole of "DAY 3: the offline re-solve" below is DONE**, except the two items promoted into
+Pending as 1c and 1h. Read this section instead of that plan; the plan is kept because its reasoning
+is still the reasoning, and because step 1 of it is the gate every future replay runs.
+
+### The harness
+
+```bash
+py -3.12 scripts/replay_cache.py --split test --run test-solver-v1 --shards 4 \
+    [--trusted-prior-pixels 30,inf] [--out predictions.csv]
+```
+
+`replay_cache.load` now takes `--split test`, reads the **local** `data/fixtures/test_dataset.parquet`
+(never `snapshot_download("PaulineLi/QuantiPhy")` — that pulls gigabytes of video to answer a
+question that opens no pixels), and unions the four shard detection caches. All 3,289 rows replay in
+seconds on CPU. `CachedBackend` and `solve_row` needed no change, exactly as predicted.
+
+**It reproduces `solver-v1` exactly.** 1,338 solved; S2 42.513% / D2 28.448% / S3 76.562% /
+D3 32.922%; and row-by-row against the GPU `predictions.csv`: identical solved/declined decision on
+all 3,289 rows, identical `method`, values agreeing to **8e-13** (CSV float formatting). That check
+is wired in as a hard gate — `check_reproduction` exits non-zero rather than print solve rates that
+could justify spending a slot.
+
+One real fidelity bug found and fixed while doing it: an **empty** cached series is a cached
+*answer* (the detector ran and found nothing), not a cache miss, and `CachedBackend` was returning it
+with a blank note. 41 rows declined with an empty reason and scattered into the tail of the very
+histogram the next fix gets chosen from. Now they report `object never detected`, matching the real
+backend, and the reason histogram is byte-identical to the GPU run's.
+
+### The finding: the trusted band, not the gravity prior, is the pocket
+
+The plan said to attack decline reasons "largest first" and listed `gravity prior cannot set pixel
+scale` at 291. **That was an artifact of counting reason *strings*.** The band's message embeds the
+measured pixel value, so it fragments into ~300 distinct strings and never appears in a `head(10)`.
+Bucketed by *cause*, over all 1,951 declined rows:
+
+| cause | S2 | D2 | S3 | D3 | total |
+|---|---|---|---|---|---|
+| **prior pixels outside trusted band** | 279 | 626 | 123 | 483 | **1,511** |
+| gravity prior cannot set pixel scale | 0 | 170 | 0 | 121 | 291 |
+| separation needs top-2 detections (`distance-twin`) | 11 | 22 | 0 | 11 | 44 |
+| prior object not measured | 32 | 8 | 0 | 0 | 40 |
+| prior names no groundable object | 0 | 2 | 0 | 35 | 37 |
+| target not measured | 7 | 2 | 6 | 1 | 16 |
+| depth-ratio guard tripped | 0 | 0 | 6 | 1 | 7 |
+| no usable scale prior | 4 | 0 | 0 | 0 | 4 |
+
+`TRUSTED_PRIOR_PIXELS = (30.0, 300.0)` is **77% of all declines and 46% of the entire test set.** It
+was fitted from 6 variants on 159 rows with a CI spanning zero. Of the 1,511 it rejects, **1,247 are
+rejected for being *above* 300 px** and only 264 for being below 30. The rejected values have a
+median of **526 px** — the upper edge is not clipping a tail, it is cutting through the middle of the
+distribution. A prior object spanning 500 px of an HD frame is ordinary, not implausible.
+
+### The two edges are not the same, and this is the number that decided it
+
+There is no test truth, so this cannot be scored offline. What *can* be done is compare each newly
+solved answer against the constant that row would otherwise get — the constant scores ~0.35, so an
+answer near it is a coin flip worth a slot and one 1000x away is a guaranteed zero, strictly worse
+than declining. The accepted 1,338 rows are the yardstick: they are already on the board earning
++0.218/row in D2.
+
+| population | n | median × const | within 2× | within 10× | >100× off |
+|---|---|---|---|---|---|
+| **accepted (the yardstick)** | 1,338 | 1.37 | 37.3% | 86.7% | **1.5%** |
+| **rejected, above 300 px** | 1,247 | 0.72 | 35.8% | 80.8% | **5.0%** |
+| rejected, below 30 px | 264 | 22.1 | 18.6% | 41.3% | **37.1%** |
+| — below 30 px, D2 only | 93 | 86.2 | 12.9% | 25.8% | 46.2% |
+| — below 30 px, D3 only | 97 | 329 | 6.2% | 21.6% | 56.7% |
+
+**The upper edge is throwing away 1,247 rows that behave statistically like the rows already
+scoring.** The lower edge is doing real work: sub-pixel priors (0.1–0.3 px) produce garbage, and in
+D2/D3 roughly half of them are >100x off. So the re-fit is **keep 30, drop 300**.
+
+Note the below-30 rows split hard by category — S2 (n=29) and S3 (n=45) have **zero** rows >100x off
+and ~85–90% within 10x, while D2/D3 are the disaster. A per-category lower edge is a real follow-up,
+worth ~74 rows. Not done, because the upper edge is worth 17x more and one slot should measure one
+change.
+
+### `solver-v2.submission.csv` — BUILT, VALIDATED, NOT YET SUBMITTED
+
+Band `(30.0, inf)`, everything else at the champion. Rebuild it with:
+
+```bash
+py -3.12 scripts/make_baseline.py --out baseline_predictions.csv          # gitignored, regenerate
+py -3.12 scripts/replay_cache.py --split test --run test-solver-v1 --shards 4 \
+    --trusted-prior-pixels 30,inf --out replay-band30inf.csv
+py -3.12 scripts/make_submission.py replay-band30inf.csv --out solver-v2.submission.csv \
+    --fallback-from baseline_predictions.csv                              # NEVER omit the fallback
+py -3.12 scripts/validate_submission.py solver-v2.submission.csv          # exits 0
+```
+
+**2,585 of 3,289 solved (78.6%), against solver-v1's 1,338 (40.7%)** — strictly more in every
+category, which was the gate set in advance:
+
+| | S2 | D2 | S3 | D3 | total |
+|---|---|---|---|---|---|
+| solver-v1 | 247 (42.5%) | 330 (28.4%) | 441 (76.6%) | 320 (32.9%) | 1,338 |
+| **solver-v2** | **497 (85.5%)** | **863 (74.4%)** | **519 (90.1%)** | **706 (72.6%)** | **2,585** |
+
+One slot measures all four categories at once, and the per-category winners then compose offline for
+free and exactly (`select_sources.py`). **Do not assume it wins.** The honest prior: the newly solved
+rows carry 5.0% >100x-off against the accepted population's 1.5%, so a category could go either way,
+and D3 already loses to a constant on the rows it answers. The composition step is what makes this
+safe to try — a category that regresses just keeps `mix-v4`'s source.
+
+`TRUSTED_PRIOR_PIXELS` in `solver.py` is **deliberately still (30.0, 300.0)**. The candidate was
+built through the `--trusted-prior-pixels` flag, so nothing in the solver changed on an unmeasured
+result. Change the default only once a slot has spoken.
+
+## DAY 3: the offline re-solve — the plan, kept for its reasoning (DONE 2026-08-25)
 
 **Why this and not more probing.** Slots 2 and 3 on Day 2 showed the constants for the three largest
 groups are already sited well, so more scale probes there are near-worthless. Meanwhile `mix-v2`
@@ -856,8 +966,11 @@ In priority order, by measured evidence rather than by hunch:
 |---|---|---|---|---|
 | ~~1~~ | ~~**"distance between A and B" must use two centroids**~~ | ~~278~~ | done | **DONE 2026-08-22.** Verified on cached detections: the billiard row went from 59.9 px (one ball's box) to 161.2 px of separation, pred/truth 0.40 → **1.083**. See "The distance fix" below. |
 | ~~1a~~ | ~~**Upload the zero-vision baseline**~~ | ~~3,289~~ | done | **DONE 2026-08-22.** 0.364, then `baseline-v3` 0.365. Champion is now `mix-v3` at 0.409. |
-| **1g** | **Offline re-solve of all 3,289 test rows** — raise the solve rate | ~1,950 | free | **TOP ITEM.** A solved row is worth +0.218 in D2 and only 28.4% of D2 is solved. Download the four `test-solver-v1-shard*/detections.pkl` (4.1 MB) and widen `replay_cache.load` to `data/fixtures/test_dataset.parquet`; `CachedBackend` and `solve_row` need no change. Then re-fit `TRUSTED_PRIOR_PIXELS` against the real scoring set instead of 159 rows. |
-| **1h** | **Diagnose D3** — the solver loses to a constant *on the rows it answers* (−0.137) | 972 | free | Same replay. D3 is 572 A-prior and 400 V-prior, no Size priors at all, so the derivative-order mechanism predicts it — but −0.137 on solved rows is a wrong answer, not a noisy one. |
+| ~~1g~~ | ~~**Offline re-solve of all 3,289 test rows**~~ | ~~1,950~~ | done | **DONE 2026-08-25.** Harness built, reproduces `solver-v1` exactly. Found the trusted band is 77% of declines, not the gravity prior. See "2026-08-25". |
+| **1i** | **Upload `solver-v2.submission.csv`** — band `(30, inf)`, 2,585 solved vs 1,338 | 3,289 | **1 slot** | **TOP ITEM, and it needs nothing built.** The file is on disk and validates. One slot scores all four categories; the winners then compose against `mix-v4` offline and exactly. Then, and only then, change `TRUSTED_PRIOR_PIXELS` in `solver.py`. |
+| **1j** | **Per-category lower edge on the band** | ~74 | free + 1 slot | Below 30 px, S2 (n=29) and S3 (n=45) have **zero** rows >100x off, while D2 (n=93) and D3 (n=97) are 46%/57% off. A lower edge of 30 for D2/D3 and ~0 for S2/S3 recovers 74 rows. Replay it; do not spend a slot until 1i has landed. |
+| **1k** | **The gravity prior** — `cannot set pixel scale` | **291** | free to try | Now the largest *remaining* bucket, and all of it is D2 (170) and D3 (121) — the two categories the paper says are our whole gap. A gravity prior gives `g = 9.81 m/s²` with no pixel length, so scale must come from the target's own kinematics; that is a solver change, then a replay. |
+| **1h** | **Diagnose D3** — the solver loses to a constant *on the rows it answers* (−0.137) | 972 | free | **Still open, and now cheap:** the replay emits `prior_pixels`/`target_pixels` per row, so the decomposition that found the 2.4x undershoot on validation can be run on all 972 D3 rows. D3 is 572 A-prior and 400 V-prior, no Size priors at all, so the derivative-order mechanism predicts it — but −0.137 on solved rows is a wrong answer, not a noisy one. |
 | 1b | **Fresh detection pass for the new phrases** | ~183 | cents | The pair fix renames phrases, so those rows are cache misses. Needed before the separation numbers can be scored at scale. |
 | 1c | `distance-twin` — "between the **two cars**", one phrase twice | **44** | free-ish | Declines by design today. Needs the detector to keep its **top-2** boxes per frame, not just the best; `DetectionSeries` holds one. Small, well-defined change to `grounding.py`. |
 | 2 | **Diagnose the velocity rows** — median ratio 0.094, four of six near zero | ~1,000 | free | Biggest category and the worst performing. Replay the cache; the quadratic fit or the `fps`/timestamp path is suspect. No GPU needed. |
@@ -917,7 +1030,7 @@ Re-read any run offline with `py -3.12 scripts/replay_cache.py --run <name>` —
 | | |
 |---|---|
 | Repo | https://github.com/prarabdhmisra/quantiphy (public, MIT) |
-| Tests | **94 on `main`, 189 on the branch** (`py -3.12 -m pytest tests/ -q`) |
+| Tests | **94 on `main`, 206 on the branch** (`py -3.12 -m pytest tests/ -q`) |
 | Plan | `~/.claude/plans/greedy-spinning-hopper.md` (the 60-day campaign, 2026-08-23 → 10-21) |
 | Track | **B (Open-Weight)** primary, A secondary |
 | Deadline | **Plan for Oct 1, 2026** (site advertises Nov 5, but its own timeline finalizes rankings mid-October) |
