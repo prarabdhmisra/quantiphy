@@ -8,9 +8,9 @@ Last worked: **2026-08-25**.
 > on the board before spending anything on GPU.
 
 > **Where things live.** This document is on both branches and is accurate on both. The *code* from
-> 2026-08-05 onward is only on **`fix/prior-grounding-phrase`** (pushed, 206 tests green) —
+> 2026-08-05 onward is only on **`fix/prior-grounding-phrase`** (pushed, 207 tests green) —
 > `main` is deliberately still at the last *measured* state, 94 tests. Anything below that names
-> `scripts/replay_cache.py`, `scripts/select_rows.py` or 206 tests needs that branch checked out:
+> `scripts/replay_cache.py`, `scripts/select_rows.py` or 207 tests needs that branch checked out:
 >
 > ```bash
 > git checkout fix/prior-grounding-phrase
@@ -20,7 +20,7 @@ Last worked: **2026-08-25**.
 
 > Resuming the QuantiPhy Challenge (NeurIPS 2026) entry. Read
 > `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
-> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (206 tests
+> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (207 tests
 > green). **The submission portal is live and scores on upload, 3/day — read "Submitting" first.**
 > Champion is **`mix-v5`, macro 0.441**, up from 0.411 — `solver-v2` scored **0.418** and beat the
 > old champion outright, gaining in all four categories. Read "2026-08-25" first: the offline replay
@@ -1066,7 +1066,7 @@ In priority order, by measured evidence rather than by hunch:
 | ~~1a~~ | ~~**Upload the zero-vision baseline**~~ | ~~3,289~~ | done | **DONE 2026-08-22.** 0.364, then `baseline-v3` 0.365. Champion is now `mix-v3` at 0.409. |
 | ~~1g~~ | ~~**Offline re-solve of all 3,289 test rows**~~ | ~~1,950~~ | done | **DONE 2026-08-25.** Harness built, reproduces `solver-v1` exactly. Found the trusted band is 77% of declines, not the gravity prior. See "2026-08-25". |
 | ~~1i~~ | ~~**Upload `solver-v2.submission.csv`**~~ | ~~3,289~~ | done | **DONE 2026-08-25: 0.418**, beating the old champion outright and gaining in all four categories. Composed to `mix-v5` at **0.441**. |
-| **1m** | **Set `TRUSTED_PRIOR_PIXELS = (30.0, inf)` in `solver.py`** | — | free | **Now measured, so change it.** The default is still `(30, 300)`; every future run has to remember the flag until it moves. Then re-check the tests that pin the band. |
+| ~~1m~~ | ~~**Set `TRUSTED_PRIOR_PIXELS = (30.0, inf)`**~~ | — | done | **DONE 2026-08-25.** Default changed, its docstring corrected (it used to claim priors over 400 px score a hard zero — the test split says otherwise), and the replay gate now pins `solver-v1`'s own `(30, 300)` beside its numbers so it does not read the live default. 207 tests. |
 | **1n** | **Try `S3\|cm` ×0.7 on top of solver-v2's S3** | 576 | 1 slot | mix-v4's rescale measured 0.477 against solver-v2's raw 0.465, but has never been applied *to* solver-v2. A scale transform on a new source is not composition-exact, so it needs a slot. Day 2's argmax also sat on the edge of the ×0.7 bracket — try ×0.5 in the same submission. |
 | **1j** | **Per-category lower edge on the band** | ~74 | free + 1 slot | Below 30 px, S2 (n=29) and S3 (n=45) have **zero** rows >100x off, while D2 (n=93) and D3 (n=97) are 46%/57% off. A lower edge of 30 for D2/D3 and ~0 for S2/S3 recovers 74 rows. Replay it; do not spend a slot until 1i has landed. |
 | **1k** | **The gravity prior** — `cannot set pixel scale` | **291** | free to try | Now the largest *remaining* bucket, and all of it is D2 (170) and D3 (121) — the two categories the paper says are our whole gap. A gravity prior gives `g = 9.81 m/s²` with no pixel length, so scale must come from the target's own kinematics; that is a solver change, then a replay. |
@@ -1131,7 +1131,7 @@ Re-read any run offline with `py -3.12 scripts/replay_cache.py --run <name>` —
 | | |
 |---|---|
 | Repo | https://github.com/prarabdhmisra/quantiphy (public, MIT) |
-| Tests | **94 on `main`, 206 on the branch** (`py -3.12 -m pytest tests/ -q`) |
+| Tests | **94 on `main`, 207 on the branch** (`py -3.12 -m pytest tests/ -q`) |
 | Plan | `~/.claude/plans/greedy-spinning-hopper.md` (the 60-day campaign, 2026-08-23 → 10-21) |
 | Track | **B (Open-Weight)** primary, A secondary |
 | Deadline | **Plan for Oct 1, 2026** (site advertises Nov 5, but its own timeline finalizes rankings mid-October) |

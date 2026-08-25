@@ -52,7 +52,7 @@ from quantiphy.backends.grounding import (  # noqa: E402
     kinematics,
 )
 from quantiphy.parsing import build_request  # noqa: E402
-from quantiphy.solver import solve_row  # noqa: E402
+from quantiphy.solver import TRUSTED_PRIOR_PIXELS, solve_row  # noqa: E402
 from quantiphy.vision import PixelMeasurement  # noqa: E402
 
 DEFAULT_REPO = "prarabdhmisra/quantiphy-runs"
@@ -63,7 +63,13 @@ TEST_PARQUET = ROOT / "data" / "fixtures" / "test_dataset.parquet"
 #: runs the identical measurement code against the identical detections, so it must reproduce these
 #: exactly before any change to the solver is believed. A mismatch means the harness is wrong, not
 #: the solver -- so this is asserted loudly rather than printed for eyeballing.
-SOLVER_V1 = {"solved": 1338, "S2": 0.42513, "D2": 0.28448, "S3": 0.76562, "D3": 0.32922}
+#:
+#: ``band`` is the ``TRUSTED_PRIOR_PIXELS`` the run itself used, and the gate always replays at it
+#: explicitly rather than at whatever the solver's default has since become. The default has already
+#: moved once -- to ``(30, inf)``, which is what this run's own numbers argued for -- and a gate that
+#: read the live default would have started failing at exactly the moment its finding was adopted.
+SOLVER_V1 = {"solved": 1338, "S2": 0.42513, "D2": 0.28448, "S3": 0.76562, "D3": 0.32922,
+             "band": (30.0, 300.0)}
 
 
 class CachedBackend:
@@ -307,11 +313,26 @@ def main() -> int:
     print(f"{len(cache)} cached (video, phrase) pairs; replaying {len(frame)} rows\n")
 
     if args.split == "test":
-        results = replay(frame, backend, **kwargs)
+        # The gate is a statement about the harness, not about the current configuration, so it
+        # replays at the band `solver-v1` itself ran with -- never at the live default, which has
+        # already moved to (30, inf). Skipped only under --limit, where a partial pass cannot
+        # reproduce a whole-run solve rate.
+        requested = kwargs.get("trusted_prior_pixels", TRUSTED_PRIOR_PIXELS)
+        gate = None
+        if limit:
+            print(f"(--limit {limit}: reproduction gate skipped, it needs all 3,289 rows)\n")
+            results = replay(frame, backend, **kwargs)
+        else:
+            gate = replay(frame, backend, trusted_prior_pixels=SOLVER_V1["band"])
+            results = (gate if requested == SOLVER_V1["band"]
+                       else replay(frame, backend, **kwargs))
+
         report(results)
-        reproduced = check_reproduction(results) if not kwargs else None
-        if reproduced is None:
-            print("(reproduction not checked: the solver was overridden for this replay)")
+        if gate is not None and results is not gate:
+            low, high = requested
+            print(f"\n(reported at band ({low:g}, {high:g}); the gate below is a separate replay "
+                  f"at solver-v1's own ({SOLVER_V1['band'][0]:g}, {SOLVER_V1['band'][1]:g}))")
+        reproduced = check_reproduction(gate) if gate is not None else None
 
         if backend.misses:
             unique = sorted(set(backend.misses))

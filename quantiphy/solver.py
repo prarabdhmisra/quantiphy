@@ -62,21 +62,31 @@ def _measure_prior(request: SolveRequest, backend: VisionBackend,
 #: 0.0 to 0.5 scored *below* a constant predictor, because ``mean_score x detection_rate`` says
 #: nothing about whether the prior measured the right thing. ``prior_pixels`` does. Across 147
 #: replayed validation rows ``log(pred/truth) ~= -0.87 * log(prior_pixels)`` with correlation
-#: -0.725: almost the entire error is the prior's own pixel measurement. Median pred/truth runs 7.04
-#: for priors under 25 px and 0.08 for priors over 400 px, and both of those score a hard zero.
+#: -0.725: almost the entire error is the prior's own pixel measurement. ``prior_pixels`` does.
+#:
+#: **The upper edge was 300.0 and it was wrong.** That number came from six variants on 159
+#: validation rows, whose macro gain had a 95% CI of [-0.028, +0.087] -- and this file used to claim
+#: on the same evidence that priors over 400 px "score a hard zero". Measured on all 3,289 test rows
+#: on 2026-08-25, the 300 px cap was rejecting **1,247 rows, 38% of the scoring set**, whose median
+#: prior was 526 px. Removing it gained in every category: S2 +0.077, D2 +0.093, S3 +0.024,
+#: D3 +0.095, macro 0.345 -> 0.418. A prior object spanning 500 px of an HD frame is ordinary.
+#:
+#: This is the third time "do not calibrate on the 159-row validation set" has been the lesson, and
+#: the first time it cost a measured 0.073. The mechanism a small sample finds can be real while
+#: every threshold it picks is noise.
+#:
+#: The lower edge does real work and stays. Sub-pixel priors are unusable: below 30 px, 37% of rows
+#: land more than 100x from the fallback constant, against 1.5% for the rows the band accepts. It
+#: splits hard by category, though -- S2 and S3 have *zero* such rows while D2 and D3 are at 46% and
+#: 57% -- so a per-category lower edge is worth ~74 more rows and has not been tried.
 #:
 #: One wart, recorded rather than hidden: ``prior_pixels`` is a pixel *extent* for a length prior but
 #: a pixel *speed* for a speed prior, so this single band is applied to two different quantities. It
-#: earns its keep empirically at both ends -- the 16 rows declined at "0.1-0.2 px" are speed priors
-#: whose object was measured as effectively stationary, which is just as unusable as a 2-pixel box --
-#: but the right fix is eventually two bands, not one. Do not read the edges as physically meaningful
-#: until that is separated.
-#:
-#: Inside the band the solver is worth firing; outside it the caller's fallback beats it. Treat the
-#: exact edges as provisional -- they were chosen from six variants on 159 rows, and while the
-#: underlying correlation is strong the resulting macro gain has a 95% CI of [-0.028, +0.087], which
-#: does not exclude zero. Confirm against the test split before building anything on the numbers.
-TRUSTED_PRIOR_PIXELS = (30.0, 300.0)
+#: earns its keep empirically -- the 16 rows declined at "0.1-0.2 px" are speed priors whose object
+#: was measured as effectively stationary, which is just as unusable as a 2-pixel box -- but the
+#: right fix is eventually two bands, not one. Do not read the edge as physically meaningful until
+#: that is separated.
+TRUSTED_PRIOR_PIXELS = (30.0, float("inf"))
 
 
 def _separation_px(first: PixelMeasurement, second: PixelMeasurement) -> float | None:

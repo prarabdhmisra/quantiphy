@@ -158,6 +158,18 @@ class TestReplay:
 
 
 class TestCheckReproduction:
+    def test_the_recorded_run_carries_its_own_band(self):
+        """The gate must never read the solver's live default.
+
+        `TRUSTED_PRIOR_PIXELS` has already moved once, to (30, inf), *because* of what this run
+        measured. A gate that compared against the live default would have begun failing at the
+        moment its own finding was adopted -- so the band the run actually used is recorded beside
+        its numbers, and the gate replays at that.
+        """
+        low, high = SOLVER_V1["band"]
+        assert low < high
+        assert (low, high) == (30.0, 300.0)
+
     def test_accepts_the_recorded_solver_v1_numbers(self, capsys):
         assert check_reproduction(_solver_v1_shaped()) is True
         assert "reproduces solver-v1 exactly" in capsys.readouterr().out
