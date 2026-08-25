@@ -22,11 +22,13 @@ Last worked: **2026-08-25**.
 > `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
 > https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (206 tests
 > green). **The submission portal is live and scores on upload, 3/day — read "Submitting" first.**
-> Champion is **`mix-v4`, macro 0.411**. **`solver-v2.submission.csv` is built, validated and
-> UNSUBMITTED — uploading it is the first thing to do, and it is the whole point of yesterday's
-> work.** Read "2026-08-25" first: the offline replay harness exists now, it reproduces the GPU run
-> exactly, and it found that `TRUSTED_PRIOR_PIXELS` — not the gravity prior — causes 77% of all
-> declines. Everything downstream of detection is now free to measure, so *replay before proposing*.
+> Champion is **`mix-v5`, macro 0.441**, up from 0.411 — `solver-v2` scored **0.418** and beat the
+> old champion outright, gaining in all four categories. Read "2026-08-25" first: the offline replay
+> harness exists now, it reproduces the GPU run exactly, and it found that `TRUSTED_PRIOR_PIXELS` —
+> not the gravity prior — caused 77% of all declines. Opening its upper edge was the biggest single
+> lever of the campaign. Everything downstream of detection is now free to measure, so *replay
+> before proposing*. **The next lever is item 1e: 3D length is off ~4x in opposite directions
+> between S3 and D3, which is an inverted ratio, 277 rows, and free to fix.**
 > Four single-cause theories of the bias have been refuted, so read "The depth hypothesis is also
 > refuted" and "Do not re-derive" before proposing a lever; it cost real money. Ask me before
 > spending more than ~$20 in a session.
@@ -351,7 +353,53 @@ backlog; do not spend a slot on it while larger pockets are open.
 * No extra ground truth anywhere: the test parquet has no posterior column, and 159 validation rows
   remain the only truth we will ever have. Checked, so nobody looks again.
 
-## CHAMPION: mix-v4, macro 0.411 — and the composition method is PROVEN
+## CHAMPION: mix-v5, macro 0.441 — the band was the biggest lever of the campaign
+
+`solver-v2` was scored on 2026-08-25 and the widened band paid in **every** category:
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| solver-v1, band (30, 300) | 0.353 | 0.368 | 0.441 | 0.220 | 0.345 |
+| **solver-v2, band (30, inf)** | **0.430** | **0.461** | 0.465 | 0.315 | **0.418** |
+| gain | +0.077 | +0.093 | +0.024 | +0.095 | **+0.073** |
+
+Two things worth keeping from that row. **The offline plausibility screen was right**: the
+above-300px rows behaved like the accepted population and were worth solving, and no category
+regressed. And **`solver-v2` at 0.418 beats `mix-v4` at 0.411 as a single source** — it is already
+"solver where it solved, constant elsewhere", because `make_submission.py --fallback-from` fills the
+declines, so there is no `mix-v2`-style per-row overlay left to add on top of it.
+
+D3 still loses to the constant (0.315 vs 0.396) even after gaining +0.095, exactly as the overshoot
+diagnosis predicts: opening the band solves more D3 rows, but the answers are still ~3x high and a
+3x overshoot scores near zero. Fixing D3 means fixing the bias, not the solve rate — item 1e.
+
+Composing the per-category winners, which is **arithmetic, not a prediction**:
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| mix-v4 (previous champion) | 0.393 | 0.377 | **0.477** | **0.396** | 0.411 |
+| solver-v2 | **0.430** | **0.461** | 0.465 | 0.315 | 0.418 |
+| **mix-v5** = solver-v2 on S2/D2, mix-v4 on S3/D3 | **0.430** | **0.461** | **0.477** | **0.396** | **0.441** |
+
+```bash
+py -3.12 scripts/select_sources.py --out mix-v5.submission.csv \
+    --source solver-v2.submission.csv --for S2,D2 \
+    --source mix-v4.submission.csv --for S3,D3
+```
+
+Built and validated. `mix-v4` keeps S3 because its `S3|cm` ×0.7 rescale measured 0.477 against
+solver-v2's 0.465 — and note that rescale has **not** been tried on top of solver-v2's S3, which is
+a real candidate for a slot rather than a derivation.
+
+**Where we now stand against the field** (paper Table 1): S2 0.430 vs Qwen3-VL-32B's 0.358 and
+GPT-5.1's 0.463; S3 0.477 vs 0.432 and 0.515. We are **ahead of the best open-weight model on both
+static-prior categories** and closing on GPT-5.1. The whole remaining gap is D2 (0.461 vs 0.516) and
+D3 (0.396 vs 0.534) — still exactly the dynamic-prior categories, and D3 is still the single worst
+channel on the board.
+
+### The previous champion, for the record
+
+#### mix-v4, macro 0.411 — and the composition method is PROVEN
 
 | | S2 | D2 | S3 | D3 | macro |
 |---|---|---|---|---|---|
@@ -1017,7 +1065,9 @@ In priority order, by measured evidence rather than by hunch:
 | ~~1~~ | ~~**"distance between A and B" must use two centroids**~~ | ~~278~~ | done | **DONE 2026-08-22.** Verified on cached detections: the billiard row went from 59.9 px (one ball's box) to 161.2 px of separation, pred/truth 0.40 → **1.083**. See "The distance fix" below. |
 | ~~1a~~ | ~~**Upload the zero-vision baseline**~~ | ~~3,289~~ | done | **DONE 2026-08-22.** 0.364, then `baseline-v3` 0.365. Champion is now `mix-v3` at 0.409. |
 | ~~1g~~ | ~~**Offline re-solve of all 3,289 test rows**~~ | ~~1,950~~ | done | **DONE 2026-08-25.** Harness built, reproduces `solver-v1` exactly. Found the trusted band is 77% of declines, not the gravity prior. See "2026-08-25". |
-| **1i** | **Upload `solver-v2.submission.csv`** — band `(30, inf)`, 2,585 solved vs 1,338 | 3,289 | **1 slot** | **TOP ITEM, and it needs nothing built.** The file is on disk and validates. One slot scores all four categories; the winners then compose against `mix-v4` offline and exactly. Then, and only then, change `TRUSTED_PRIOR_PIXELS` in `solver.py`. |
+| ~~1i~~ | ~~**Upload `solver-v2.submission.csv`**~~ | ~~3,289~~ | done | **DONE 2026-08-25: 0.418**, beating the old champion outright and gaining in all four categories. Composed to `mix-v5` at **0.441**. |
+| **1m** | **Set `TRUSTED_PRIOR_PIXELS = (30.0, inf)` in `solver.py`** | — | free | **Now measured, so change it.** The default is still `(30, 300)`; every future run has to remember the flag until it moves. Then re-check the tests that pin the band. |
+| **1n** | **Try `S3\|cm` ×0.7 on top of solver-v2's S3** | 576 | 1 slot | mix-v4's rescale measured 0.477 against solver-v2's raw 0.465, but has never been applied *to* solver-v2. A scale transform on a new source is not composition-exact, so it needs a slot. Day 2's argmax also sat on the edge of the ×0.7 bracket — try ×0.5 in the same submission. |
 | **1j** | **Per-category lower edge on the band** | ~74 | free + 1 slot | Below 30 px, S2 (n=29) and S3 (n=45) have **zero** rows >100x off, while D2 (n=93) and D3 (n=97) are 46%/57% off. A lower edge of 30 for D2/D3 and ~0 for S2/S3 recovers 74 rows. Replay it; do not spend a slot until 1i has landed. |
 | **1k** | **The gravity prior** — `cannot set pixel scale` | **291** | free to try | Now the largest *remaining* bucket, and all of it is D2 (170) and D3 (121) — the two categories the paper says are our whole gap. A gravity prior gives `g = 9.81 m/s²` with no pixel length, so scale must come from the target's own kinematics; that is a solver change, then a replay. |
 | ~~1h~~ | ~~**Diagnose D3**~~ | ~~972~~ | done | **DONE 2026-08-25.** It is a ~3x *overshoot* rising monotonically with the prior's derivative order, and overshoot scores zero. The fixable part is item 1e. See "D3 diagnosed". |
