@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from clip_disagreement import clip, parse_clip  # noqa: E402
 from disagreement import add_keys, ratios, table  # noqa: E402
+import method_ids  # noqa: E402
 
 
 def predictions(**overrides) -> pd.DataFrame:
@@ -125,3 +126,41 @@ def test_clipped_rows_carry_a_reason_naming_the_threshold():
     frame = predictions(parsed_value=[1.0, 20.0, 1.0, 1.0])
     out, _ = clip(frame, constants(), {"D2": 10.0})
     assert "10" in out.loc[1, "reason"]
+
+
+# --- method_ids ---------------------------------------------------------------------------------
+
+def test_method_ids_selects_by_substring_and_emits_ids_not_row_indices():
+    selected = method_ids.select(predictions(), contains="radial")
+    assert list(selected["id"]) == [3]                      # row_index 2 -> id 3
+    assert list(selected["category"]) == ["S3"]
+
+
+def test_method_ids_exact_match_does_not_pick_up_the_modified_variants():
+    """`geometric-3d` as a substring also matches `geometric-3d+radial`, and in D3 those two sit at
+    2.29x and 0.75x the constant. Selecting one and silently getting both is the whole failure mode
+    this script exists to avoid."""
+    assert list(method_ids.select(predictions(), methods=("geometric-3d",))["id"]) == [4]
+    assert list(method_ids.select(predictions(), contains="geometric-3d")["id"]) == [3, 4]
+
+
+def test_method_ids_excludes_declined_rows():
+    frame = predictions(method=["none", "", "geometric-2d", "geometric-2d"])
+    assert list(method_ids.select(frame, contains="geometric")["id"]) == [3, 4]
+
+
+def test_method_ids_restricts_to_the_named_categories():
+    assert list(method_ids.select(predictions(), contains="geometric-2d",
+                                 categories=("D2",))["id"]) == [2]
+
+
+def test_method_ids_refuses_an_empty_selection():
+    """An empty overlay composes to a byte-identical copy of the base: it validates, uploads, and
+    spends one of three daily slots measuring nothing."""
+    with pytest.raises(SystemExit):
+        method_ids.select(predictions(), contains="no-such-route")
+
+
+def test_method_ids_refuses_an_unknown_category():
+    with pytest.raises(SystemExit):
+        method_ids.select(predictions(), contains="geometric", categories=("D4",))

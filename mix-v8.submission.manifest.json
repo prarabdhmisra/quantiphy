@@ -1,0 +1,67 @@
+{
+  "base": "C:\\Users\\prara_\\AppData\\Local\\Temp\\claude\\C--Users-prara--Quantiphy\\5714ef1a-7f49-4cae-9366-6a392f91781e\\scratchpad\\step1.csv",
+  "overlay": "baseline-v3.submission.csv",
+  "submission": "mix-v8.submission.csv",
+  "rows": 41,
+  "by_category": {
+    "S2": {
+      "from_overlay": 0,
+      "category_rows": 581
+    },
+    "D2": {
+      "from_overlay": 0,
+      "category_rows": 1160
+    },
+    "S3": {
+      "from_overlay": 41,
+      "category_rows": 576
+    },
+    "D3": {
+      "from_overlay": 0,
+      "category_rows": 972
+    }
+  },
+  "ids": [
+    1039,
+    1117,
+    1143,
+    1146,
+    1160,
+    1173,
+    1186,
+    1193,
+    1505,
+    1694,
+    1720,
+    1723,
+    1755,
+    2479,
+    2497,
+    2502,
+    2507,
+    2525,
+    2531,
+    2536,
+    2542,
+    2548,
+    2554,
+    2571,
+    2572,
+    2580,
+    2581,
+    2589,
+    2590,
+    2596,
+    2597,
+    2603,
+    2604,
+    2610,
+    2611,
+    2704,
+    2711,
+    2718,
+    2725,
+    2732,
+    2739
+  ]
+}
