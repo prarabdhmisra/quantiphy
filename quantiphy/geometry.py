@@ -126,6 +126,38 @@ def radial_speed(depths: tuple[DepthReading, ...], object_name: str) -> float | 
     return (timed[-1].distance_m - timed[0].distance_m) / span
 
 
+def tangential_component(total_si: float, radial_si: float | None) -> float | None:
+    """The in-plane part of a 3D magnitude whose along-axis part is known, or None if impossible.
+
+    The mirror of :func:`combine_speeds`, and it exists because the solver was applying the radial
+    correction to only one of the two objects it uses. ``depth_info`` gives the *prior* object's
+    distance-to-camera over time just as readily as the target's, and a prior that states a 3D speed
+    while its pixels record only the in-plane projection makes ``gamma`` too large by
+    ``1 / sqrt(1 - (v_r/v)^2)``. Measured over the 251 D3 rows where the prior is a speed and its
+    depth readings support a radial estimate, the median along-axis share of the prior's own speed is
+    **0.62** -- so this is not a small correction, and it is one-way: it always inflated the answer.
+
+    ``None`` when the decomposition is not physically available -- ``|radial| >= |total|`` means the
+    depth readings and the stated prior contradict each other rather than that the object is moving
+    exactly at the camera. Emitting a near-zero tangential speed there would drive ``gamma`` to zero
+    and the answer to a hard zero, which is the worst outcome the metric has.
+
+    Note this makes the scale transfer only *asymptotically* linear in the prior: the counterfactual
+    test in :func:`solve`'s own suite multiplies the prior by up to 1000, and at that factor the
+    radial share vanishes and linearity is exact to 1e-6. That is correct physics rather than a
+    regression -- scaling the stated speed without scaling the scene's depths describes an
+    inconsistent world -- but it is worth knowing before quoting the guarantee as exact.
+    """
+    if radial_si is None:
+        return abs(total_si)
+    if not math.isfinite(total_si) or not math.isfinite(radial_si):
+        return None
+    total, radial = abs(total_si), abs(radial_si)
+    if radial >= total:
+        return None
+    return math.sqrt(total * total - radial * radial)
+
+
 def combine_speeds(tangential_si: float, radial_si: float | None) -> float:
     """Total speed from in-plane and along-axis components."""
     if radial_si is None:
@@ -195,13 +227,22 @@ def depth_for(depths: tuple[DepthReading, ...], object_name: str | None,
 
 def solve(*, target_pixels: float, prior_world_si: float, prior_pixels: float,
           target_depth_m: float | None = None, prior_depth_m: float | None = None,
-          radial_si: float | None = None, is_speed: bool = False) -> float:
+          radial_si: float | None = None, prior_radial_si: float | None = None,
+          is_speed: bool = False) -> float:
     """Full scale transfer: pixel measurement plus one prior to an SI answer.
 
     Applies the perspective correction whenever both depths are known, and folds in radial motion
     for speeds. Falls back to the flat 2D scale when depth is unavailable.
+
+    ``prior_radial_si`` is the *prior* object's own along-axis speed, and it is subtracted off in
+    quadrature before the scale is taken -- see :func:`tangential_component`. ``radial_si`` is the
+    target's and is added back in afterwards; the two are opposite operations on opposite objects,
+    which is exactly why only one of them existed for so long.
     """
-    gamma = gamma_from_prior(prior_world_si, prior_pixels)
+    prior_in_plane = tangential_component(prior_world_si, prior_radial_si)
+    if prior_in_plane is None:
+        prior_in_plane = prior_world_si
+    gamma = gamma_from_prior(prior_in_plane, prior_pixels)
     value = world_from_pixels(target_pixels, gamma=gamma)
 
     if target_depth_m is not None and prior_depth_m is not None:

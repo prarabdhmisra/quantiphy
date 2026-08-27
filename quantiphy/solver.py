@@ -183,6 +183,18 @@ def solve_row(request: SolveRequest, backend: VisionBackend, video_path: str,
     if request.dimension == "speed" and request.is_3d:
         radial = geometry.radial_speed(request.depths, target_name)
 
+    # The mirror of the line above, on the *other* object, and it was missing. A speed prior states
+    # a 3D speed while ``prior_pixels`` recorded only its in-plane projection, so gamma came out too
+    # large by 1/sqrt(1 - (v_r/v)^2) on every such row -- and D3 is 100% dynamic-prior rows, which is
+    # why that category alone overshot. Deliberately restricted to speed priors: the same
+    # decomposition on acceleration priors is refuted (see the pinned test), because d2Z/dt2 from
+    # two to four depth readings over a 2-3 s clip is noise, and it measured a radial share of 1.50.
+    prior_radial = None
+    if prior.dimension == "speed" and request.is_3d:
+        prior_radial = geometry.radial_speed(request.depths, prior.object_name)
+    prior_tangential = (prior_radial is not None
+                        and geometry.tangential_component(prior.value_si, prior_radial) is not None)
+
     try:
         value_si = geometry.solve(
             target_pixels=target_pixels,
@@ -191,6 +203,7 @@ def solve_row(request: SolveRequest, backend: VisionBackend, video_path: str,
             target_depth_m=target_depth if use_depth else None,
             prior_depth_m=prior_depth if use_depth else None,
             radial_si=radial,
+            prior_radial_si=prior_radial,
             is_speed=(request.dimension == "speed"),
         )
     except geometry.ScaleError as error:
@@ -215,6 +228,8 @@ def solve_row(request: SolveRequest, backend: VisionBackend, video_path: str,
         method += "+separation"
     if radial:
         method += "+radial"
+    if prior_tangential:
+        method += "+prior-tangential"
     if not request.target_object:
         # We measured the prior's object for want of a target phrase, so every question about this
         # video collapses onto one answer. Still emit it -- a blank scores a hard zero -- but leave

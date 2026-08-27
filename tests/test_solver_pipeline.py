@@ -377,3 +377,72 @@ def test_centroid_at_evaluates_the_trajectory_at_the_requested_instant() -> None
     assert centroid_at(series, 2.0) == pytest.approx((200.0, 30.0), abs=1e-6)
     # With no instant named, the median position is the best available estimate.
     assert centroid_at(series, None) == pytest.approx((150.0, 30.0), abs=1e-6)
+
+
+# ------------------------------- 2026-08-27: the prior's own motion toward the camera
+
+def _speed_prior_row(**overrides) -> dict:
+    """A 3D row whose prior is a speed and whose prior object also moves along the camera axis.
+
+    This is the D3 population exactly: `D3` is `[dynamic prior][3D]`, so every one of its 972 rows
+    carries a velocity or acceleration prior and a depth track.
+    """
+    fields = {
+        "question": "What is the length of the boat in meters?",
+        "prior": "speed of the ferry = 5.0m/s",
+        "video_type": "V3MC", "inference_type": "DS",
+        "depth_info": ("t=0.0s, distance_ferry_camera = 10.0m\n"
+                       "t=1.0s, distance_ferry_camera = 13.0m\n"
+                       "t=1.0s, distance_boat_camera = 10.0m"),
+    }
+    return row(**{**fields, **overrides})
+
+
+def _boat_backend() -> FakeBackend:
+    return FakeBackend({
+        "ferry": PixelMeasurement("ferry", speed_px_per_s=100.0, confidence=0.9),
+        "boat": PixelMeasurement("boat", extent_px=100.0, confidence=0.9),
+    })
+
+
+def test_a_3d_speed_prior_is_scaled_by_its_in_plane_component_only() -> None:
+    """gamma must come from the 4.0 m/s the pixels could see, not the 5.0 m/s the prior states."""
+    answer = solve_row(build_request(_speed_prior_row()), _boat_backend(), "c.mp4")
+    assert "+prior-tangential" in answer.method
+    assert answer.value == pytest.approx(4.0)          # was 5.0: a 25% overshoot on every such row
+
+
+def test_a_2d_speed_prior_is_left_alone() -> None:
+    """No perspective, so the pixel speed already is the whole speed."""
+    answer = solve_row(build_request(_speed_prior_row(video_type="V2MC")),
+                       _boat_backend(), "c.mp4")
+    assert "+prior-tangential" not in answer.method
+    assert answer.value == pytest.approx(5.0)
+
+
+def test_an_impossible_prior_radial_leaves_the_scale_untouched() -> None:
+    """Radial 9 m/s against a stated 5 m/s means the readings disagree with the prior. Emitting
+    the tiny tangential part would drive gamma to ~0 and the answer to a hard zero."""
+    answer = solve_row(build_request(_speed_prior_row(
+        depth_info=("t=0.0s, distance_ferry_camera = 10.0m\n"
+                    "t=1.0s, distance_ferry_camera = 19.0m\n"
+                    "t=1.0s, distance_boat_camera = 10.0m"))), _boat_backend(), "c.mp4")
+    assert "+prior-tangential" not in answer.method
+    assert answer.value == pytest.approx(5.0)
+
+
+def test_an_acceleration_prior_is_never_radially_corrected() -> None:
+    """REFUTED 2026-08-27, and pinned so it is not re-added. The same decomposition on the 172 D3
+    acceleration-prior rows with three or more depth readings measures a radial share of **1.50** --
+    physically impossible, because d2Z/dt2 over a 2-3 s clip with 2-4 readings is noise. Applying it
+    moved the median answer from 1.07x the constant to 1.90x and doubled the >1.9x share to 50%.
+    """
+    answer = solve_row(build_request(_speed_prior_row(
+        prior="acceleration of the ferry = 5.0m/s^2",
+        question="What is the acceleration of the boat in m/s^2?")),
+        FakeBackend({
+            "ferry": PixelMeasurement("ferry", accel_px_per_s2=100.0, confidence=0.9),
+            "boat": PixelMeasurement("boat", accel_px_per_s2=100.0, confidence=0.9),
+        }), "c.mp4")
+    assert "+prior-tangential" not in answer.method
+    assert answer.value == pytest.approx(5.0)

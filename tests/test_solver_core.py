@@ -481,3 +481,34 @@ def test_prior_depth_is_read_at_the_instant_its_pixels_were_measured() -> None:
     assert stale_prior_depth == pytest.approx(17.8)
     assert target_depth / stale_prior_depth == pytest.approx(23.2 / 17.8)
 
+
+
+# ------------------------------------------- 2026-08-27: the prior's own radial motion
+
+def test_tangential_component_removes_the_along_axis_part() -> None:
+    assert geometry.tangential_component(5.0, 3.0) == pytest.approx(4.0)
+    assert geometry.tangential_component(5.0, -3.0) == pytest.approx(4.0)
+    assert geometry.tangential_component(5.0, 0.0) == pytest.approx(5.0)
+    assert geometry.tangential_component(5.0, None) == pytest.approx(5.0)
+
+
+@pytest.mark.parametrize("radial", [5.0, 6.0, -7.5, float("nan"), float("inf")])
+def test_tangential_component_declines_an_impossible_decomposition(radial: float) -> None:
+    """A radial part at or above the stated total means the two disagree, not that the object
+    is moving straight at the camera. Returning ~0 there would emit a hard zero."""
+    assert geometry.tangential_component(5.0, radial) is None
+
+
+def test_solve_uses_a_smaller_scale_when_the_prior_moves_toward_the_camera() -> None:
+    """The prior states a 3D speed; the pixels only ever saw its in-plane part. Dividing the full
+    3D speed by the in-plane pixel speed inflates gamma, and D3 is 100% dynamic-prior rows."""
+    flat = geometry.solve(target_pixels=100, prior_world_si=5.0, prior_pixels=100)
+    corrected = geometry.solve(target_pixels=100, prior_world_si=5.0, prior_pixels=100,
+                               prior_radial_si=3.0)
+    assert flat == pytest.approx(5.0)
+    assert corrected == pytest.approx(4.0)
+
+
+def test_solve_falls_back_to_the_full_prior_when_the_radial_part_is_impossible() -> None:
+    assert geometry.solve(target_pixels=100, prior_world_si=5.0, prior_pixels=100,
+                          prior_radial_si=9.0) == pytest.approx(5.0)
