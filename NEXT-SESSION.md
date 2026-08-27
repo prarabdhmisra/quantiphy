@@ -1,6 +1,6 @@
 # Resume here
 
-Last worked: **2026-08-25**.
+Last worked: **2026-08-26**.
 
 > **THE PORTAL IS LIVE.** The single most important thing on this page. Submissions are scored on
 > upload and return a per-category MRA immediately, 3 per UTC day. Everything below that says
@@ -18,20 +18,106 @@ Last worked: **2026-08-25**.
 
 ## Paste this to start the next session
 
-> Resuming the QuantiPhy Challenge (NeurIPS 2026) entry. Read
+> Resuming the QuantiPhy Challenge (NeurIPS 2026). Read
 > `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
-> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (207 tests
-> green). **The submission portal is live and scores on upload, 3/day — read "Submitting" first.**
-> Champion is **`mix-v5`, macro 0.441**, up from 0.411 — `solver-v2` scored **0.418** and beat the
-> old champion outright, gaining in all four categories. Read "2026-08-25" first: the offline replay
-> harness exists now, it reproduces the GPU run exactly, and it found that `TRUSTED_PRIOR_PIXELS` —
-> not the gravity prior — caused 77% of all declines. Opening its upper edge was the biggest single
-> lever of the campaign. Everything downstream of detection is now free to measure, so *replay
-> before proposing*. **The next lever is item 1e: 3D length is off ~4x in opposite directions
-> between S3 and D3, which is an inverted ratio, 277 rows, and free to fix.**
-> Four single-cause theories of the bias have been refuted, so read "The depth hypothesis is also
-> refuted" and "Do not re-derive" before proposing a lever; it cost real money. Ask me before
-> spending more than ~$20 in a session.
+> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (219 tests
+> green). **The portal is live and scores on upload, 3/day — read "Submitting".** Champion is
+> **`mix-v7`, macro 0.4435**, built offline and **not yet on the board** (the board's best is
+> `mix-v5` at 0.441) — upload it as slot 1 for provenance. Read "2026-08-26" first: three whole
+> strategies were closed that day. **Constant-multiplier probing is exhausted** (8 group probes over
+> two days, every one lost). **D3 is closed to the solver** at any clip threshold — its ceiling is
+> the pure constant's 0.396, proven, so stop trying. And **the solver's disagreement with the
+> constant means opposite things in D2 and D3**: in D2 the solver's 10x-outliers are its most
+> valuable rows (+0.192/row), in D3 they are its worst (-0.257/row). **The next lever is item 1k,
+> the gravity prior — 291 rows, 170 of them in D2, the category where the solver is worth the most
+> per row.** Five single-cause theories of the 3D bias have now been refuted; read "Do not
+> re-derive" and the 2026-08-26 section before proposing a lever. Ask me before spending more than
+> ~$20 in a session.
+
+## 2026-08-26 — three strategies closed, and the champion moved 0.441 -> 0.4435
+
+Three slots, twelve readings, and the day's value was almost entirely in what it ruled out. Two new
+committed instruments: `scripts/disagreement.py` (the ratio-vs-constant table, which reproduces the
+2026-08-25 ad-hoc analysis digit-for-digit and is now re-runnable) and `scripts/clip_disagreement.py`.
+
+### Track A vs Track B — ANSWERED, and there is nothing to choose
+
+The upload form on `auth/account.html` has **no track control at all**: one file input, one counter
+reading `N / 3 SCORED TODAY`. Track is not a per-upload decision, so a single upload is the entry
+for both boards and the "does dual-track cost two slots" worry in the old text is moot. Every
+component is open-weight, so every file is B-eligible and therefore A-eligible. Worth one line to
+the organizers asking how they assign tracks; it blocks nothing.
+
+### The three closures
+
+1. **Constant-multiplier probing is EXHAUSTED.** `probe-d3a` moved four groups toward the solver's
+   own median ratio and **lost in all four** (group-mean deltas: `S2|m/s` -0.059, `D2|m/s` -0.114,
+   `S3|cm` -0.203, `D3|cm` -0.124). With Day 2's x0.7/x1.4 also losing on four other groups, that is
+   8 probes and 8 losses. The constants are at their argmax. **The solver's median ratio vs the
+   constant is NOT a guide to where a constant belongs** — that inference was the whole basis of the
+   probe and it is refuted. Do not spend another slot on a group multiplier.
+
+2. **D3 is CLOSED to the solver.** The clip curve rises 0.315 -> 0.386 (>5x) -> 0.395 (>2x) and the
+   full-clip limit is the pure constant's 0.396. Inverting `solver-v3`, the solver rows that agree
+   with the constant within 5x score **0.374** against the constant's 0.396 — worse. So no threshold
+   exists at which the solver beats a constant in D3. Stop optimising D3 with geometry; only a
+   different *arm* (the VLM) can move it.
+
+3. **Item 1e (the inverted 3D ratio) is REFUTED — the fifth single-cause theory to fall.** Measured
+   directly: median `Z_target / Z_prior` is **1.000-1.02 in every category/dimension slice**, so the
+   depth correction is a near-no-op and cannot cause a 4x error. The `geometric-3d` vs `-2d` split
+   that looked like a code defect is a **population** split — slicing by `(category, unit)` instead
+   shows *both* routes undershoot in `S3|cm` and *both* overshoot in `D3|cm`.
+
+### The finding worth building on
+
+**Disagreement with the constant means opposite things in D2 and D3.** From `solver-v3`, per
+clipped row against `solver-v2`:
+
+| category | clip | effect of reverting those rows | reading |
+|---|---|---|---|
+| D2 | >10x | **-0.192/row** | the solver was **earning**; a 10x gap means the *constant* is wrong |
+| D2 | >100x | -0.002 reported | even 100x outliers earn. The solver is trustworthy in D2 at extremes |
+| D3 | >5x | **+0.257/row** | the solver was losing badly |
+| S3 | >10x | +0.161/row | clipping helps; lands exactly on `mix-v4`'s 0.477 |
+| S2 | >20x | ~0 | noise |
+
+So **D2 is where solver coverage is worth the most**, and 297 D2 rows are still declined. That sizes
+item 1k directly: 170 of the 291 gravity-prior rows are in D2, at roughly +0.19/row, which is
+`170 * 0.19 / 1160` ~= **+0.028 on D2** if they solve as well as existing rows. Biggest lever left.
+
+### Item 1j: half of it wins, and the other half is a trap
+
+Dropping the trusted band's lower edge from 30 px to 0:
+
+* **S2: 0.430 -> 0.440 (+0.010) on 29 rows — ADOPTED**, and it is the whole of today's gain.
+* **S3: 0.465 -> 0.451 (-0.014) on 45 rows — REJECTED.**
+
+Both populations had **0% of rows >100x off**, which is exactly why this is worth writing down:
+**"0% >100x" is not a quality signal.** A row 2-10x off scores zero just as surely and never appears
+in that column. Judge a population by `within2x`, not by the extreme tail.
+
+### Item 1l: sized, and it is ~3 rows, not 328
+
+The old estimate counted all 454 `geometric-3d` rows, but `radial_speed` only applies to **speed**
+questions. There are 277 of those and **216 already fire**. Of the 61 that do not, 27 have a single
+matched depth reading (genuinely underdetermined) and only **3** are blocked by the timestamp gate.
+Closed.
+
+### Where the champion stands
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| mix-v5 (yesterday) | 0.430 | 0.461 | 0.477 | 0.396 | 0.441 |
+| **mix-v7 = solver-v4 on S2, mix-v5 elsewhere** | **0.440** | 0.461 | 0.477 | 0.396 | **0.4435** |
+
+Built and validated with `scripts/select_sources.py`. **Not on the board** — the standing rule
+forbids spending a slot to confirm a composition, but the official record only knows `mix-v5` at
+0.441, so upload `mix-v7` as tomorrow's slot 1 for provenance rather than for information.
+
+Against the field: S2 **0.440** vs Qwen3-VL-32B's 0.358 and GPT-5.1's 0.463; S3 0.477 vs 0.432 and
+0.515. The gap is still entirely D2 (0.461 vs 0.516) and D3 (0.396 vs 0.534), and D3 now has only
+one road left: the VLM arm.
 
 ## 2026-08-25 — the replay harness is built, and the band is 77% of all declines
 
@@ -1067,17 +1153,17 @@ In priority order, by measured evidence rather than by hunch:
 | ~~1g~~ | ~~**Offline re-solve of all 3,289 test rows**~~ | ~~1,950~~ | done | **DONE 2026-08-25.** Harness built, reproduces `solver-v1` exactly. Found the trusted band is 77% of declines, not the gravity prior. See "2026-08-25". |
 | ~~1i~~ | ~~**Upload `solver-v2.submission.csv`**~~ | ~~3,289~~ | done | **DONE 2026-08-25: 0.418**, beating the old champion outright and gaining in all four categories. Composed to `mix-v5` at **0.441**. |
 | ~~1m~~ | ~~**Set `TRUSTED_PRIOR_PIXELS = (30.0, inf)`**~~ | — | done | **DONE 2026-08-25.** Default changed, its docstring corrected (it used to claim priors over 400 px score a hard zero — the test split says otherwise), and the replay gate now pins `solver-v1`'s own `(30, 300)` beside its numbers so it does not read the live default. 207 tests. |
-| **1n** | **Try `S3\|cm` ×0.7 on top of solver-v2's S3** | 576 | 1 slot | mix-v4's rescale measured 0.477 against solver-v2's raw 0.465, but has never been applied *to* solver-v2. A scale transform on a new source is not composition-exact, so it needs a slot. Day 2's argmax also sat on the edge of the ×0.7 bracket — try ×0.5 in the same submission. |
-| **1j** | **Per-category lower edge on the band** | ~74 | free + 1 slot | Below 30 px, S2 (n=29) and S3 (n=45) have **zero** rows >100x off, while D2 (n=93) and D3 (n=97) are 46%/57% off. A lower edge of 30 for D2/D3 and ~0 for S2/S3 recovers 74 rows. Replay it; do not spend a slot until 1i has landed. |
-| **1k** | **The gravity prior** — `cannot set pixel scale` | **291** | free to try | Now the largest *remaining* bucket, and all of it is D2 (170) and D3 (121) — the two categories the paper says are our whole gap. A gravity prior gives `g = 9.81 m/s²` with no pixel length, so scale must come from the target's own kinematics; that is a solver change, then a replay. |
+| ~~1n~~ | ~~**Try `S3\|cm` rescale on top of solver-v2's S3**~~ | ~~576~~ | done | **CLOSED 2026-08-26.** ×0.5 beyond the champion lost **-0.203 on the group's mean**, so `mix-v4`'s ×0.7 is at or near the argmax after all. Constant-multiplier probing is exhausted generally: 8 group probes over two days, 8 losses. |
+| ~~1j~~ | ~~**Per-category lower edge on the band**~~ | ~~74~~ | done | **HALF ADOPTED 2026-08-26.** Floor 0 in **S2 wins +0.010** (29 rows, adopted into `mix-v7`); in **S3 it loses -0.014** (45 rows, rejected). Both had 0% of rows >100x off -- so **`0% >100x` is not a quality signal**; judge by `within2x`. |
+| **1k (TOP)** | **The gravity prior** — `cannot set pixel scale` | **291** | free to try | Now the largest *remaining* bucket, and all of it is D2 (170) and D3 (121) — the two categories the paper says are our whole gap. A gravity prior gives `g = 9.81 m/s²` with no pixel length, so scale must come from the target's own kinematics; that is a solver change, then a replay. **PROMOTED TO TOP 2026-08-26:** 170 of the 291 are in D2, and D2 is now measured as the category where a solved row is worth the most (+0.19/row, and even its 100x-outliers earn). Sized at roughly **+0.028 on D2**. Every other free lever is closed. |
 | ~~1h~~ | ~~**Diagnose D3**~~ | ~~972~~ | done | **DONE 2026-08-25.** It is a ~3x *overshoot* rising monotonically with the prior's derivative order, and overshoot scores zero. The fixable part is item 1e. See "D3 diagnosed". |
 | 1b | **Fresh detection pass for the new phrases** | ~183 | cents | The pair fix renames phrases, so those rows are cache misses. Needed before the separation numbers can be scored at scale. |
 | 1c | `distance-twin` — "between the **two cars**", one phrase twice | **44** | free-ish | Declines by design today. Needs the detector to keep its **top-2** boxes per frame, not just the best; `DetectionSeries` holds one. Small, well-defined change to `grounding.py`. |
 | 2 | **Diagnose the velocity rows** — median ratio 0.094, four of six near zero | ~1,000 | free | Biggest category and the worst performing. Replay the cache; the quadratic fit or the `fps`/timestamp path is suspect. No GPU needed. |
 | ~~1d~~ | ~~**CONFIDENCE GATING**~~ | — | done | **REFUTED 2026-08-22 on 159 rows.** Every threshold scores below the constant; detector confidence does not predict correctness. See "The confidence gate is REFUTED". |
-| **1e** | **Fix `geometric-3d` on LENGTH questions** — 277 rows off by ~4x in *opposite* directions (S3 0.26, D3 5.69) | **277** | free | **Diagnosed 2026-08-25, and narrowed: 3D *speed* is healthy (0.99/1.16 with radial), so this is the length path only.** Opposite-signed error in one path says a ratio is inverted — check `geometry.solve`'s `target_depth_m`/`prior_depth_m` against `solver.py:167-170`. Replay to verify; no GPU. |
-| **1l** | **Widen where the radial correction can fire** | ~328 | free | `radial_speed` needs two timed depth readings, so it fires on only 126 of 454 `geometric-3d` rows — and where it fires the route is unbiased (0.99/1.16) against 0.54 where it does not. |
-| 1f | Confirm-or-kill the 1.5x disagreement gate on the test set | all | 1 slot + test run | +0.013 with CI [+0.0013,+0.0252], but it survived ~20 variants on 159 rows. Treat as unproven until a real submission says otherwise. |
+| ~~1e~~ | ~~**Fix `geometric-3d` on LENGTH questions**~~ | ~~277~~ | done | **REFUTED 2026-08-26.** Median `Z_target/Z_prior` measured at **1.000-1.02 in every slice** -- the depth correction is a near-no-op and cannot cause a 4x error. The 3d-vs-2d split is a *population* split by `(category, unit)`, not a code defect. Fifth single-cause theory of this bias to fall. |
+| ~~1l~~ | ~~**Widen where the radial correction can fire**~~ | ~~3~~ | done | **CLOSED 2026-08-26, mis-sized by 100x.** The old count included non-speed rows; `radial_speed` only applies to speed. 277 such rows, 216 already fire, 27 underdetermined, and only **3** blocked by the timestamp gate. |
+| ~~1f~~ | ~~Confirm-or-kill the disagreement gate on the test set~~ | ~~all~~ | done | **MEASURED 2026-08-26 and it SPLITS by category.** Reverting rows that disagree with the constant is worth **+0.257/row in D3** and **-0.192/row in D2** -- the solver's D2 outliers are its best rows. Adopted nowhere as a blanket rule; the split itself is the finding. |
 | 3 | Kill the fatal overshoots: gate on prior confidence | — | free | The `pedestrian walking` prior scored 0.341 with box width jittering 13–59 px and produced 7x overshoots. `min_confidence` already exists and is unused (`solve_row` defaults it to 0.0). Now that `detection_rate` is fixed, confidence is finally meaningful. |
 | 4 | Decide on `fix/prior-grounding-phrase` | 412 | free | Real defects, 114 tests green, but it did **not** move the metric. Merge on correctness grounds, not on a score claim. |
 | 5 | Full 159-row validation run on `l4x1` | — | ~1–3 h, $5–15 | **Promoted: this is now the unblocking step.** It has ground truth, so it is what the confidence gate is fitted on. Do this before any full test run. |
