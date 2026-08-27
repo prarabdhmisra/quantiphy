@@ -37,12 +37,34 @@ from quantiphy.parsing import SolveRequest
 #: itself a signal -- a reply without it usually means the model refused or hedged.
 ANSWER_SENTINEL = "ANSWER:"
 
-_SYSTEM = (
+_SYSTEM_BASE = (
     "You are a careful physical measurement assistant. You are given frames from a video, a "
     "real-world reference measurement taken from that same scene, and a question. Use the reference "
     "measurement to set the scale -- do not answer from typical real-world sizes, because the scene "
-    "may be scaled differently from what you expect. Reason briefly, then give a single number."
+    "may be scaled differently from what you expect."
 )
+
+#: The two prompt styles the arm can be run at, and the reason there are exactly two.
+#:
+#: The paper's Table 2 measures chain-of-thought against video+prior at 56.1 -> 27.7, 49.8 -> 22.4
+#: and 50.1 -> 23.1: it roughly *halves* MRA for every strong model, and only one small model gains.
+#: This module shipped asking for "one or two sentences" of reasoning, which is mild CoT and sits on
+#: the wrong side of that finding -- so the variant is a measurement to make, not a knob to tune.
+#:
+#: ``brief`` is the incumbent and stays the default: every ``prompt_sha`` recorded so far is a brief
+#: prompt, and moving the default would make a resumed run non-comparable with its own checkpoint.
+_STYLES = {
+    "brief": ("Reason briefly, then give a single number.",
+              "Keep any reasoning to one or two sentences, then end with exactly:"),
+    "direct": ("Give a single number and nothing else.",
+               "Give the number only, with no explanation, as exactly:"),
+}
+
+
+def _style(name: str) -> tuple[str, str]:
+    if name not in _STYLES:
+        raise ValueError(f"unknown prompt style {name!r}; expected one of {sorted(_STYLES)}")
+    return _STYLES[name]
 
 _NUMBER = re.compile(r"[-+]?(?:\d+(?:[ ,]\d{3})*(?:\.\d+)?|\.\d+)(?:\s*[eE][-+]?\d+)?")
 
@@ -62,7 +84,8 @@ class ParsedAnswer:
         return self.value is not None
 
 
-def build_prompt(request: SolveRequest, prior_text: str, depth_text: str | None) -> str:
+def build_prompt(request: SolveRequest, prior_text: str, depth_text: str | None,
+                 style: str = "brief") -> str:
     """The user-turn text accompanying the frames.
 
     ``prior_text`` and ``depth_text`` are passed through verbatim from the dataset rather than
@@ -80,13 +103,13 @@ def build_prompt(request: SolveRequest, prior_text: str, depth_text: str | None)
     lines.append("")
     lines.append(
         f"Answer with a single number in {request.output_unit}. Do not convert to any other unit. "
-        f"Keep any reasoning to one or two sentences, then end with exactly:")
+        f"{_style(style)[1]}")
     lines.append(f"{ANSWER_SENTINEL} <number>")
     return "\n".join(lines)
 
 
-def system_prompt() -> str:
-    return _SYSTEM
+def system_prompt(style: str = "brief") -> str:
+    return f"{_SYSTEM_BASE} {_style(style)[0]}"
 
 
 def _to_float(raw: str) -> float | None:

@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from quantiphy.parsing import build_request
-from quantiphy.prompting import ANSWER_SENTINEL, build_prompt, parse_answer
+from quantiphy.prompting import ANSWER_SENTINEL, build_prompt, parse_answer, system_prompt
 
 
 def row(question: str, prior: str = "length of boat = 3.62m", **over):
@@ -117,3 +117,46 @@ def test_prompt_does_not_ask_the_model_to_answer_low() -> None:
                           "length of boat = 3.62m", None).lower()
     for nudge in ("underestimate", "err low", "smaller", "conservative"):
         assert nudge not in prompt
+
+
+# --------------------------------------------------- 2026-08-27: the CoT switch
+
+def test_the_default_style_still_asks_for_brief_reasoning() -> None:
+    """`brief` is what every prompt_sha recorded so far used. Changing the default silently would
+    make a new run non-comparable with an old one while the run name stayed the same."""
+    request = build_request(row("What is the width of the pier in meters?"))
+    assert "reasoning" in build_prompt(request, "length of boat = 3.62m", None)
+    assert build_prompt(request, "length of boat = 3.62m", None) == build_prompt(
+        request, "length of boat = 3.62m", None, style="brief")
+
+
+def test_the_direct_style_asks_for_no_reasoning_at_all() -> None:
+    """The paper's Table 2 puts CoT at 56.1 -> 27.7, 49.8 -> 22.4, 50.1 -> 23.1 against
+    video+prior: it roughly halves MRA for every strong model. So the no-reasoning variant is the
+    challenger, not a micro-optimisation."""
+    request = build_request(row("What is the width of the pier in meters?"))
+    direct = build_prompt(request, "length of boat = 3.62m", None, style="direct")
+    assert "reasoning" not in direct and "Reason" not in direct
+    assert ANSWER_SENTINEL in direct                    # the sentinel is the parser's only anchor
+    assert "Reason" not in system_prompt("direct")
+    assert "Reason briefly" in system_prompt("brief")
+
+
+def test_both_styles_keep_the_prior_the_unit_and_the_instant() -> None:
+    """Whatever else changes, the three things the benchmark turns on must survive both styles."""
+    request = build_request(row("What is the speed of the car at 1.0s in m/s?"))
+    for style in ("brief", "direct"):
+        prompt = build_prompt(request, "length of boat = 3.62m", "distance_car_camera = 9m",
+                              style=style)
+        assert "3.62m" in prompt and "m/s" in prompt
+        assert "t = 1 s" in prompt and "Camera distances" in prompt
+
+
+def test_an_unknown_style_is_refused_rather_than_silently_defaulted() -> None:
+    """A typo in the env var must not quietly produce a run that measures the incumbent again and
+    reports it as the challenger."""
+    request = build_request(row("What is the width of the pier in meters?"))
+    with pytest.raises(ValueError):
+        build_prompt(request, "length of boat = 3.62m", None, style="chain-of-thought")
+    with pytest.raises(ValueError):
+        system_prompt("verbose")

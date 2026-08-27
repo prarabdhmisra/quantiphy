@@ -50,6 +50,7 @@ Environment:
     RUN_NAME          output folder, default "<split>-vlm-<model tail>"
     SHARD             "k/n" contiguous slice, as in run_vision_job.py
     LIMIT             row cap, for a smoke test
+    VLM_PROMPT        "brief" (default, mild CoT) or "direct" (no reasoning at all)
     VLM_FRAMES        frames per question, default 12
     VLM_4BIT          "1" to load 4-bit -- fits a 32B on a 40 GB A100 or Kaggle's 2x16 GB
     QUANTIPHY_GIT     pip-installable source, when the package is not already importable
@@ -181,6 +182,7 @@ def main() -> int:
         raise SystemExit("OUTPUT_REPO is required so results survive the session")
     split = os.environ.get("SPLIT", "validation")
     model_id = os.environ.get("VLM_MODEL", "Qwen/Qwen3-VL-8B-Instruct")
+    style = os.environ.get("VLM_PROMPT", "brief")
 
     install_solver()
 
@@ -197,10 +199,14 @@ def main() -> int:
     name = os.environ.get("RUN_NAME") or f"{split}-vlm-{model_id.split('/')[-1]}"
     done, local = load_checkpoint(output_repo, name)
 
+    # Fail before the model loads, not on row 1 of 159, if the style name is a typo.
+    system = system_prompt(style)
+
     backend = VlmBackend(model_id,
                          frames=int(os.environ.get("VLM_FRAMES", 12)),
                          load_in_4bit=os.environ.get("VLM_4BIT") == "1")
-    log(f"model {model_id}  4bit={backend.load_in_4bit}  frames={backend.frames}")
+    log(f"model {model_id}  4bit={backend.load_in_4bit}  frames={backend.frames}  "
+        f"prompt={style}")
     log(f"device {backend.device}")
 
     prior_column = "ground_truth_prior" if "ground_truth_prior" in frame.columns else "prior"
@@ -219,13 +225,14 @@ def main() -> int:
                 request = build_request(row)
                 depth = row.get("depth_info")
                 prompt = build_prompt(request, str(row[prior_column]),
-                                      None if depth is None or str(depth) == "nan" else str(depth))
+                                      None if depth is None or str(depth) == "nan" else str(depth),
+                                      style=style)
                 reply = backend.answer(index, str(row["video_id"]), str(row["video_path"]),
-                                       system_prompt(), prompt, request.timestamp)
+                                       system, prompt, request.timestamp)
                 parsed = parse_answer(reply.raw_text, request.output_unit)
                 record = {
                     "row_index": index, "video_id": reply.video_id, "raw_text": reply.raw_text,
-                    "model": model_id, "note": reply.note,
+                    "model": model_id, "note": reply.note, "prompt_style": style,
                     "prompt_sha": hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:12],
                     "frame_times": [round(t, 3) for t in reply.frame_times],
                     "unit": request.output_unit,
