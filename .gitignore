@@ -31,3 +31,9 @@ venv/
 
 # The paper: 23 MB, and it lives on the Hub and arXiv anyway.
 *.pdf
+
+# Replay/predictions intermediates -- regenerate with replay_cache.py, never committed
+replay-band*.csv
+band-mixed.predictions.csv
+clip-v1.predictions.csv
+slot3.predictions.csv
