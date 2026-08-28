@@ -297,10 +297,42 @@ for K in 1 2 3 4; do
 done
 ```
 
-**Then do not fuse anything.** Turn the VLM run into its own submission, spend one slot on it, and
-*select per category* against `mix-v8` -- that composition is arithmetic once both are scored, and
-this project has refuted four attempts to predict per-row which arm is right. Log-space fusion is a
-later question and it needs two scored parents first.
+**Then do not fuse anything.** Log-space fusion needs two scored parents and this project has refuted
+four attempts to predict per-row which arm is right.
+
+### The composition to build when the shards land — one slot, four independent experiments
+
+The obvious move is a *pure* VLM submission, to read its four category numbers and then select per
+category by arithmetic. **Do not do that.** It spends a slot measuring a submission we would never
+use: every row the VLM declines would fall back to the zero-vision constant, and `mix-v8` beats that
+constant in all four categories, so the reading would understate the arm everywhere.
+
+Overlay onto `mix-v8` instead, and only on the rows the model answered **in the demanded format**:
+
+```bash
+py -3.12 scripts/vlm_predictions.py --run test-vlm-qwen3vl8b-brief --shards 4 \
+    --out vlm-v1.predictions.csv
+py -3.12 scripts/make_submission.py vlm-v1.predictions.csv --out vlm-v1.submission.csv \
+    --fallback-from baseline_predictions.csv
+py -3.12 scripts/method_ids.py vlm-v1.predictions.csv --contains sentinel \
+    --out data/probes/ids-vlm-sentinel.csv
+py -3.12 scripts/select_rows.py --base mix-v8.submission.csv --overlay vlm-v1.submission.csv \
+    --overlay-ids data/probes/ids-vlm-sentinel.csv --out mix-v9.submission.csv
+py -3.12 scripts/validate_submission.py mix-v9.submission.csv
+```
+
+Every row that is not an overlaid sentinel row keeps `mix-v8`'s value, so the fallback is the
+champion rather than a constant. Each category then reads independently as
+
+    delta(C) = (VLM sentinel rows in C / rows in C) * (VLM per row - mix-v8 per row)
+
+which is **four experiments in one slot**, and the sign of each says directly whether to keep the VLM
+there. Compose the winners with `select_sources.py` afterwards; that step is arithmetic.
+
+**Expected, from the 159 validation rows and therefore weak:** positive in D2 and D3 (+0.169/row over
+a constant on D2+D3 sentinel rows), negative in S2 and S3, where our solver already beats the VLM
+outright. If S2 and S3 do come back negative, that is the result working, not a failure -- take the
+solver there and the VLM in the dynamic pair, which is the split the paper predicted from the start.
 
 `scripts/score_vlm.py` (new) re-parses `vlm_raw.jsonl` rather than trusting the run's own
 `parsed_value`, scores against validation truth, and compares two runs on the *intersection* of rows
