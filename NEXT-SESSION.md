@@ -20,19 +20,26 @@ Last worked: **2026-08-26**.
 
 > Resuming the QuantiPhy Challenge (NeurIPS 2026). Read
 > `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
-> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (219 tests
+> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (241 tests
 > green). **The portal is live and scores on upload, 3/day — read "Submitting".** Champion is
-> **`mix-v7`, macro 0.4435**, built offline and **not yet on the board** (the board's best is
-> `mix-v5` at 0.441) — upload it as slot 1 for provenance. Read "2026-08-26" first: three whole
-> strategies were closed that day. **Constant-multiplier probing is exhausted** (8 group probes over
-> two days, every one lost). **D3 is closed to the solver** at any clip threshold — its ceiling is
-> the pure constant's 0.396, proven, so stop trying. And **the solver's disagreement with the
-> constant means opposite things in D2 and D3**: in D2 the solver's 10x-outliers are its most
-> valuable rows (+0.192/row), in D3 they are its worst (-0.257/row). **The next lever is item 1k,
-> the gravity prior — 291 rows, 170 of them in D2, the category where the solver is worth the most
-> per row.** Five single-cause theories of the 3D bias have now been refuted; read "Do not
-> re-derive" and the 2026-08-26 section before proposing a lever. Ask me before spending more than
-> ~$20 in a session.
+> **`mix-v7`, macro 0.4435**; **`mix-v8` is built, validated and unsubmitted** — it carries the
+> 2026-08-27 D3 fix on 240 rows plus an S3 cleanup on 41, with S2 and D2 as bit-identical controls
+> that must come back at 0.440 and 0.461. The board's best is still `mix-v5` at 0.441.
+>
+> **The VLM arm is now the top item, and everything geometric is worth thousandths.** Solver on
+> S2/S3 plus a Qwen-class VLM on D2/D3 composes to **~0.492** by arithmetic, and at 0.4435 we are
+> still below the paper's best open-weight number (0.460), which is what Track B has to beat. A
+> prompt A/B (`brief` vs `direct` — the CoT question) ran on the 159 truth-bearing validation rows on
+> 2026-08-27; read it with `py -3.12 scripts/score_vlm.py --run validation-vlm-qwen3vl8b-brief
+> --run validation-vlm-qwen3vl8b-direct` before committing to a full test pass.
+>
+> Read "2026-08-27" then "2026-08-26" before proposing a lever. **Six single-cause theories of the 3D
+> bias have been refuted and the seventh was real:** the radial correction was applied to the target
+> and never to the prior, which could only ever fire in D3. **Constant-multiplier probing is
+> exhausted** (8 group probes, 8 losses). **"D3 is closed to the solver" holds for thresholds on
+> disagreement magnitude but not for selection by route** — see `scripts/method_ids.py`. Item 1k (the
+> gravity prior) is re-sized and **not free**: its 46 videos are all detection-cache misses. Ask me
+> before spending more than ~$20 in a session.
 
 ## 2026-08-27 — the radial correction was only ever applied to one of the two objects
 
