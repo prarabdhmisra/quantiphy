@@ -32,6 +32,38 @@ DEFAULT_FRAMES = 12
 #: frames from t=15 s, and spending the budget locally is more accurate at no extra cost.
 INSTANT_WINDOW_S = 1.0
 
+#: Longest side, in pixels, a frame is downscaled to before it reaches the processor.
+#:
+#: **Not a quality dial -- a memory bound.** Qwen-VL tokenizes by *area*, roughly one visual token
+#: per 32x32 block, so cost is quadratic in the frame's long side while nothing upstream capped it.
+#: The 159-row validation split ran fine at native resolution and the 3,289-row test split OOMed all
+#: four shards on the same 22 GB L4, because the test videos are larger: at 1920x1080 a single frame
+#: is ~2,000 visual tokens and twelve of them ~24,000, against ~320 and ~3,900 here.
+#:
+#: 768 is chosen to bound the worst case rather than to trade accuracy, and the objects these
+#: questions ask about are not near the resolution limit -- they are cars, balls and people filling a
+#: good part of the frame. Raise it if a measurement ever says detail is the binding constraint;
+#: do not raise it to "use the GPU we paid for".
+MAX_FRAME_SIDE = 768
+
+
+def downscale(frame, max_side: int = MAX_FRAME_SIDE):
+    """Shrink a PIL frame so its long side is at most ``max_side``, preserving aspect ratio.
+
+    A no-op for frames already within the bound, so a small clip is untouched and the validation
+    numbers measured before this existed stay reproducible on the videos they were measured on.
+    """
+    if max_side <= 0:
+        return frame
+    width, height = frame.size
+    longest = max(width, height)
+    if longest <= max_side:
+        return frame
+    scale = max_side / longest
+    from PIL import Image
+    return frame.resize((max(1, round(width * scale)), max(1, round(height * scale))),
+                        Image.BILINEAR)
+
 
 @dataclass
 class VlmAnswer:
@@ -74,11 +106,13 @@ class VlmBackend:
     """A vision-language model answering one question at a time."""
 
     def __init__(self, model_id: str, frames: int = DEFAULT_FRAMES,
-                 max_new_tokens: int = 128, load_in_4bit: bool = False) -> None:
+                 max_new_tokens: int = 128, load_in_4bit: bool = False,
+                 max_frame_side: int = MAX_FRAME_SIDE) -> None:
         self.model_id = model_id
         self.frames = frames
         self.max_new_tokens = max_new_tokens
         self.load_in_4bit = load_in_4bit
+        self.max_frame_side = max_frame_side
         self._model = None
         self._processor = None
 
@@ -154,7 +188,8 @@ class VlmBackend:
             if not ok:
                 break
             if index in wanted:
-                frames.append(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
+                frames.append(downscale(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)),
+                                        self.max_frame_side))
                 times.append(index / fps)
             index += 1
         capture.release()
@@ -180,15 +215,29 @@ class VlmBackend:
         ]
         text = self._processor.apply_chat_template(messages, tokenize=False,
                                                    add_generation_prompt=True)
-        inputs = self._processor(text=[text], images=frames, return_tensors="pt")
-        inputs = {key: value.to(self._model.device) for key, value in inputs.items()}
+        try:
+            inputs = self._processor(text=[text], images=frames, return_tensors="pt")
+            inputs = {key: value.to(self._model.device) for key, value in inputs.items()}
 
-        with torch.inference_mode():
-            generated = self._model.generate(**inputs, max_new_tokens=self.max_new_tokens,
-                                             do_sample=False)
-        # Slice off the prompt before decoding. Decoding the whole sequence would feed our own
-        # instructions to the parser, and "ANSWER: <number>" appears in the prompt itself.
-        reply = self._processor.batch_decode(
-            generated[:, inputs["input_ids"].shape[1]:], skip_special_tokens=True)[0]
+            with torch.inference_mode():
+                generated = self._model.generate(**inputs, max_new_tokens=self.max_new_tokens,
+                                                 do_sample=False)
+            # Slice off the prompt before decoding. Decoding the whole sequence would feed our own
+            # instructions to the parser, and "ANSWER: <number>" appears in the prompt itself.
+            reply = self._processor.batch_decode(
+                generated[:, inputs["input_ids"].shape[1]:], skip_special_tokens=True)[0]
+        except Exception as error:                                            # noqa: BLE001
+            # One row must never kill a shard. All four test shards died on a single
+            # `torch.OutOfMemoryError` and lost every row after it -- the checkpoint saved the run
+            # but not the hours. The frame cap makes an OOM unlikely; this makes it survivable, and
+            # covers the whole class (a corrupt clip, a processor edge case) rather than just OOM.
+            # A recorded empty reply reaches the fallback, which is the same soft failure the
+            # geometric backend has always had.
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            sizes = "x".join(str(dimension) for dimension in frames[0].size)
+            return VlmAnswer(row_index, video_id, "", prompt, tuple(times.tolist()), self.model_id,
+                             note=f"{type(error).__name__} on {len(frames)} frames of {sizes}: "
+                                  f"{str(error)[:200]}")
         return VlmAnswer(row_index, video_id, reply.strip(), prompt,
                          tuple(times.tolist()), self.model_id)

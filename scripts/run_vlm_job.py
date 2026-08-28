@@ -57,6 +57,7 @@ Environment:
     LIMIT             row cap, for a smoke test
     VLM_PROMPT        "brief" (default, mild CoT) or "direct" (no reasoning at all)
     VLM_FRAMES        frames per question, default 12
+    VLM_MAX_SIDE      longest frame side in px, default 768 -- a memory bound, see vlm.py
     VLM_4BIT          "1" to load 4-bit -- fits a 32B on a 40 GB A100 or Kaggle's 2x16 GB
     QUANTIPHY_GIT     pip-installable source, when the package is not already importable
 """
@@ -218,7 +219,7 @@ def main() -> int:
     from huggingface_hub import HfApi
     from tqdm import tqdm
 
-    from quantiphy.backends.vlm import VlmBackend
+    from quantiphy.backends.vlm import MAX_FRAME_SIDE, VlmBackend
     from quantiphy.parsing import build_request
     from quantiphy.prompting import build_prompt, parse_answer, system_prompt
 
@@ -233,9 +234,10 @@ def main() -> int:
 
     backend = VlmBackend(model_id,
                          frames=int(os.environ.get("VLM_FRAMES", 12)),
-                         load_in_4bit=os.environ.get("VLM_4BIT") == "1")
+                         load_in_4bit=os.environ.get("VLM_4BIT") == "1",
+                         max_frame_side=int(os.environ.get("VLM_MAX_SIDE", MAX_FRAME_SIDE)))
     log(f"model {model_id}  4bit={backend.load_in_4bit}  frames={backend.frames}  "
-        f"prompt={style}")
+        f"prompt={style}  max_side={backend.max_frame_side}")
     log(f"device {backend.device}")
 
     prior_column = "ground_truth_prior" if "ground_truth_prior" in frame.columns else "prior"

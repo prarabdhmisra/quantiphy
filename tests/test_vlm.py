@@ -23,6 +23,7 @@ import pytest
 from quantiphy.backends.vlm import (
     DEFAULT_FRAMES,
     INSTANT_WINDOW_S,
+    downscale,
     VlmAnswer,
     choose_frame_times,
 )
@@ -92,3 +93,35 @@ def test_answer_keeps_the_reply_unparsed() -> None:
     answer = VlmAnswer(row_index=3, video_id="v", raw_text="ANSWER: 4.2")
     assert answer.raw_text == "ANSWER: 4.2"
     assert not hasattr(answer, "value")
+
+
+# ------------------------------------- 2026-08-27: the frame cap that OOMed the test pass
+
+def test_downscale_bounds_the_long_side_and_keeps_the_aspect_ratio() -> None:
+    """Qwen-VL tokenizes by area, so cost is quadratic in the long side and nothing capped it.
+    All four test shards OOMed on a 22 GB L4 while the 159 validation rows had run fine."""
+    from PIL import Image
+    wide = downscale(Image.new("RGB", (1920, 1080)), max_side=768)
+    assert wide.size == (768, 432)
+    tall = downscale(Image.new("RGB", (1080, 1920)), max_side=768)
+    assert tall.size == (432, 768)
+
+
+def test_downscale_leaves_a_frame_already_within_the_bound_untouched() -> None:
+    """So a small clip is bit-identical to what the pre-cap runs saw, and the validation numbers
+    stay reproducible on the videos they were measured on."""
+    from PIL import Image
+    original = Image.new("RGB", (640, 480))
+    assert downscale(original, max_side=768) is original
+
+
+def test_downscale_never_produces_a_zero_dimension() -> None:
+    """A 4000x3 letterbox strip must not round its short side to 0 and raise inside the processor."""
+    from PIL import Image
+    assert min(downscale(Image.new("RGB", (4000, 3)), max_side=768).size) >= 1
+
+
+def test_downscale_is_disabled_by_a_non_positive_cap() -> None:
+    from PIL import Image
+    original = Image.new("RGB", (1920, 1080))
+    assert downscale(original, max_side=0) is original
