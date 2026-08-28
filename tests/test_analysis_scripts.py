@@ -22,6 +22,7 @@ from clip_disagreement import clip, parse_clip  # noqa: E402
 from disagreement import add_keys, ratios, table  # noqa: E402
 import method_ids  # noqa: E402
 import score_vlm  # noqa: E402
+import vlm_predictions  # noqa: E402
 
 from quantiphy import scoring  # noqa: E402
 
@@ -246,3 +247,71 @@ def test_score_vlm_refuses_an_empty_run(tmp_path, monkeypatch):
                         type("M", (), {"hf_hub_download": staticmethod(lambda *a, **k: str(path))}))
     with pytest.raises(SystemExit):
         score_vlm.load_raw("repo", "run")
+
+
+# --- vlm_predictions ----------------------------------------------------------------------------
+
+def vlm_dataset() -> pd.DataFrame:
+    return pd.DataFrame({
+        "video_id": ["v0", "v1", "v2", "v3"],
+        "question": ["What is the width of the box in meters?"] * 4,
+        "video_type": ["S2SX", "V2SX", "S3SX", "A3SX"],
+        "inference_type": ["SS", "DS", "SS", "DS"],
+    })
+
+
+def vlm_replies(records) -> pd.DataFrame:
+    return pd.DataFrame(records).set_index("row_index").sort_index()
+
+
+def test_vlm_predictions_emits_a_row_for_every_dataset_row_not_just_answered_ones():
+    """A row the job never reached is a *declined* row that must reach the fallback. Dropping it
+    leaves a hole make_submission fills silently and no count ever reveals."""
+    frame = vlm_predictions.predictions(
+        vlm_replies([{"row_index": 0, "raw_text": "ANSWER: 2.0", "unit": "meters"}]),
+        vlm_dataset())
+    assert len(frame) == 4
+    assert list(frame["method"]) == ["vlm-sentinel", "none", "none", "none"]
+    assert list(frame.loc[1:, "reason"]) == ["row never attempted"] * 3
+
+
+def test_vlm_predictions_records_the_parse_route_as_the_method():
+    """So method_ids.py can overlay only the rows answered in the demanded format, without anyone
+    inventing a new confidence signal."""
+    frame = vlm_predictions.predictions(
+        vlm_replies([{"row_index": 0, "raw_text": "ANSWER: 2.0", "unit": "meters"},
+                     {"row_index": 1, "raw_text": "about 3.5", "unit": "meters"}]),
+        vlm_dataset())
+    assert list(frame.loc[:1, "method"]) == ["vlm-sentinel", "vlm-last-number"]
+    assert list(method_ids.select(frame, contains="sentinel")["id"]) == [1]
+
+
+def test_vlm_predictions_declines_a_zero_and_says_so():
+    """A zero is a hard zero that still counts, so it must reach the fallback rather than be
+    emitted. 38 of 42 fallbacks on the 2026-08-27 validation run were exactly this."""
+    frame = vlm_predictions.predictions(
+        vlm_replies([{"row_index": 0, "raw_text": "It is stationary.\nANSWER: 0",
+                      "unit": "meters"}]), vlm_dataset())
+    assert frame.loc[0, "method"] == "none"
+    assert frame.loc[0, "parsed_value"] is None
+    assert "zero" in frame.loc[0, "reason"]
+
+
+def test_vlm_predictions_reparses_rather_than_copying_the_runs_own_value():
+    frame = vlm_predictions.predictions(
+        vlm_replies([{"row_index": 0, "raw_text": "ANSWER: 2.0", "unit": "meters",
+                      "parsed_value": 99.0}]), vlm_dataset())
+    assert frame.loc[0, "parsed_value"] == pytest.approx(2.0)
+
+
+def test_vlm_predictions_refuses_shards_that_overlap(tmp_path, monkeypatch):
+    """A sharded run partitions rows, so an overlap means the SHARD arithmetic is wrong. The two
+    replies answer the same question and picking one is a coin flip."""
+    def fake_download(repo, repo_type, filename):
+        path = tmp_path / filename.replace("/", "_")
+        path.write_text('{"row_index": 0, "raw_text": "ANSWER: 1", "unit": "m"}\n', encoding="utf-8")
+        return str(path)
+    monkeypatch.setitem(sys.modules, "huggingface_hub",
+                        type("M", (), {"hf_hub_download": staticmethod(fake_download)}))
+    with pytest.raises(SystemExit, match="more than one shard"):
+        vlm_predictions.load_raw("repo", "run", shards=2)
