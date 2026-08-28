@@ -89,7 +89,31 @@ def install_solver() -> None:
     if not source:
         raise SystemExit("quantiphy is not importable and QUANTIPHY_GIT is unset")
     log(f"installing {source}")
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", source], check=True)
+
+    # `hf jobs uv run` executes inside an ephemeral uv environment with **no pip in it**, so
+    # `python -m pip` fails outright -- which is exactly how this script's first two launches died,
+    # in seconds, on `No module named pip`. run_vision_job.py already carried this ladder; the VLM
+    # arm had the naive version because it had never actually run. uv first, then pip for anywhere
+    # else this runs (Colab, Kaggle, a plain venv), then a bare clone onto sys.path.
+    attempts = (["uv", "pip", "install", "-q", "--python", sys.executable, source],
+                [sys.executable, "-m", "pip", "install", "-q", source])
+    for command in attempts:
+        try:
+            subprocess.check_call(command)
+            return
+        except (subprocess.CalledProcessError, FileNotFoundError, OSError) as error:
+            log(f"  {command[0]} install failed ({error}); trying the next option")
+
+    # `git+<url>@<ref>` is pip syntax, not git's: `git clone` would take the whole thing as a URL.
+    url = source.removeprefix("git+")
+    url, _, ref = url.partition("@")
+    checkout = WORK / "src"
+    log(f"  falling back to a plain clone of {url}" + (f" at {ref}" if ref else ""))
+    if not checkout.exists():
+        clone = ["git", "clone", "--depth", "1"] + (["--branch", ref] if ref else [])
+        subprocess.check_call(clone + [url, str(checkout)])
+    sys.path.insert(0, str(checkout))
+    import quantiphy  # noqa: F401  -- fail here, not 200 rows into the run
 
 
 def load_split(split: str):
