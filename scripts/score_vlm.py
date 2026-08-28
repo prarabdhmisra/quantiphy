@@ -72,8 +72,16 @@ def reparse(raw: pd.DataFrame, units: pd.Series) -> pd.DataFrame:
     return pd.DataFrame(rows).set_index("row_index")
 
 
-def evaluate(truth: pd.DataFrame, parsed: pd.DataFrame, fallback: pd.Series | None):
-    """Score the rows the run reached, filling unparseable ones from ``fallback`` when given."""
+def evaluate(truth: pd.DataFrame, parsed: pd.DataFrame,
+             fallback: pd.Series | None) -> tuple[pd.DataFrame, int]:
+    """The scorable frame for the rows the run reached, and how many were filled.
+
+    Restricted to rows the run actually answered, which matters for a run still in flight: scoring a
+    partial run over the full denominator would read every unreached row as a hard zero and measure
+    the crash rather than the model. Scoring is left to the caller because a partial run can be
+    legitimately *unscorable* -- the official evaluator reports no average at all when a category is
+    empty, and saying which category is missing is more useful than a bare traceback.
+    """
     frame = truth.loc[truth.index.intersection(parsed.index)].copy()
     frame["parsed_value"] = parsed["value"].reindex(frame.index)
     filled = 0
@@ -81,7 +89,7 @@ def evaluate(truth: pd.DataFrame, parsed: pd.DataFrame, fallback: pd.Series | No
         blank = frame["parsed_value"].isna()
         filled = int(blank.sum())
         frame.loc[blank, "parsed_value"] = fallback.reindex(frame.index[blank]).to_numpy()
-    return frame, score(frame), filled
+    return frame, filled
 
 
 def main() -> int:
@@ -114,18 +122,24 @@ def main() -> int:
         print(f"\n=== {run} ===")
         raw = load_raw(args.repo, run)
         parsed = reparse(raw, units)
-        frame, result, filled = evaluate(truth, parsed, fallback)
-        results[run], frames[run] = result, frame
-
+        frame, filled = evaluate(truth, parsed, fallback)
         print(f"  {len(frame)} of {len(truth)} rows answered; "
               f"{int(parsed['value'].notna().sum())} parsed"
               + (f", {filled} filled from the constant" if filled else ""))
         print(f"  routes: {dict(parsed['route'].value_counts())}")
+        try:
+            result = score(frame)
+        except ValueError as error:
+            # A run still in flight, most likely. Not an error worth a traceback: the rows it has
+            # are real, there is just no macro average until all four categories are present.
+            print(f"  NOT SCORABLE YET: {error}")
+            continue
+        results[run], frames[run] = result, frame
         print(f"  macro MRA {result.macro_mra:.4f}   invalid {result.invalid_fraction:.1%}")
         print("  " + "  ".join(f"{name} {result.per_category[name]:.4f} "
                                f"(n={result.counts[name]})" for name in CATEGORIES))
 
-    if len(args.run) == 2:
+    if len(args.run) == 2 and len(frames) == 2:
         first, second = args.run
         shared = frames[first].index.intersection(frames[second].index)
         print(f"\n=== {second} against {first}, on the {len(shared)} rows both answered ===")

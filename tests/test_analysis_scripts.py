@@ -21,6 +21,9 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from clip_disagreement import clip, parse_clip  # noqa: E402
 from disagreement import add_keys, ratios, table  # noqa: E402
 import method_ids  # noqa: E402
+import score_vlm  # noqa: E402
+
+from quantiphy import scoring  # noqa: E402
 
 
 def predictions(**overrides) -> pd.DataFrame:
@@ -164,3 +167,82 @@ def test_method_ids_refuses_an_empty_selection():
 def test_method_ids_refuses_an_unknown_category():
     with pytest.raises(SystemExit):
         method_ids.select(predictions(), contains="geometric", categories=("D4",))
+
+
+# --- score_vlm ----------------------------------------------------------------------------------
+
+def vlm_truth() -> pd.DataFrame:
+    """Four validation-shaped rows, one per scored category."""
+    return pd.DataFrame({
+        "question": ["What is the width of the box in meters?"] * 4,
+        "video_type": ["S2SX", "V2SX", "S3SX", "A3SX"],
+        "inference_type": ["SS", "DS", "SS", "DS"],
+        "ground_truth_posterior": [2.0, 2.0, 2.0, 2.0],
+    })
+
+
+def vlm_raw(**overrides) -> pd.DataFrame:
+    frame = pd.DataFrame({
+        "row_index": [0, 1, 2, 3],
+        "raw_text": ["ANSWER: 2.0", "ANSWER: 2.0", "ANSWER: 2.0", "ANSWER: 2.0"],
+        "unit": ["meters"] * 4,
+    }).assign(**overrides)
+    return frame.set_index("row_index")
+
+
+def test_score_vlm_reparses_the_raw_text_rather_than_trusting_parsed_value():
+    """The raw reply is the artefact. A parser fix has to be measurable without a second GPU pass,
+    so a stale `parsed_value` in the jsonl must not be able to shadow it."""
+    raw = vlm_raw(raw_text=["ANSWER: 2.0"] * 4, parsed_value=[99.0] * 4)
+    parsed = score_vlm.reparse(raw, pd.Series(["meters"] * 4))
+    assert list(parsed["value"]) == [2.0] * 4
+    assert set(parsed["route"]) == {"sentinel"}
+
+
+def test_score_vlm_scores_only_the_rows_the_run_reached():
+    """A half-finished run must not be scored over the full denominator: every unreached row would
+    read as a hard zero and the number would measure the crash, not the model."""
+    frame, filled = score_vlm.evaluate(
+        vlm_truth(), score_vlm.reparse(vlm_raw().iloc[:2], pd.Series(["meters"] * 2)), None)
+    assert len(frame) == 2
+    assert filled == 0
+    # ...and two categories are then empty, which the official evaluator treats as no average at
+    # all rather than a partial one. Left to the caller so it can name the missing category.
+    with pytest.raises(ValueError, match="no scorable rows"):
+        scoring.score(frame)
+
+
+def test_score_vlm_fills_an_unparseable_row_from_the_constant():
+    """A blank scores a hard zero and still counts, so a real submission would fall back. Scoring
+    without the fallback measures the parser as much as the model."""
+    raw = vlm_raw(raw_text=["ANSWER: 2.0", "I cannot tell", "ANSWER: 2.0", "ANSWER: 2.0"])
+    parsed = score_vlm.reparse(raw, pd.Series(["meters"] * 4))
+    fallback = pd.Series([5.0] * 4)
+    frame, filled = score_vlm.evaluate(vlm_truth(), parsed, fallback)
+    result = scoring.score(frame)
+    assert filled == 1
+    assert frame["parsed_value"].tolist() == [2.0, 5.0, 2.0, 2.0]
+    assert result.invalid_fraction == 0.0            # nothing blank reaches the scorer
+
+
+def test_score_vlm_keeps_the_last_reply_when_a_resumed_run_duplicated_a_row(tmp_path, monkeypatch):
+    """A resumed run appends, so a duplicate row_index means the checkpoint replayed rows. Counting
+    both would double that row in the denominator."""
+    path = tmp_path / "vlm_raw.jsonl"
+    path.write_text('{"row_index": 0, "raw_text": "ANSWER: 1.0", "unit": "meters"}\n'
+                    '{"row_index": 0, "raw_text": "ANSWER: 7.0", "unit": "meters"}\n',
+                    encoding="utf-8")
+    monkeypatch.setattr(score_vlm, "hf_hub_download", lambda *a, **k: str(path), raising=False)
+    monkeypatch.setitem(sys.modules, "huggingface_hub",
+                        type("M", (), {"hf_hub_download": staticmethod(lambda *a, **k: str(path))}))
+    raw = score_vlm.load_raw("repo", "run")
+    assert len(raw) == 1 and raw.iloc[0]["raw_text"] == "ANSWER: 7.0"
+
+
+def test_score_vlm_refuses_an_empty_run(tmp_path, monkeypatch):
+    path = tmp_path / "vlm_raw.jsonl"
+    path.write_text("", encoding="utf-8")
+    monkeypatch.setitem(sys.modules, "huggingface_hub",
+                        type("M", (), {"hf_hub_download": staticmethod(lambda *a, **k: str(path))}))
+    with pytest.raises(SystemExit):
+        score_vlm.load_raw("repo", "run")
