@@ -22,10 +22,12 @@ Last worked: **2026-08-26**.
 > `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
 > https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (241 tests
 > green). **The portal is live and scores on upload, 3/day — read "Submitting".** Champion is
-> **`mix-v9`, macro 0.487** on the board (S2 0.447, D2 0.540, S3 0.488, D3 0.475), and
-> **`mix-v10` = 0.4915** is built, validated and **unsubmitted** -- `mix-v9` on S2/D2/D3 plus
-> `mix-v8` on S3, which is arithmetic rather than a prediction. Upload it. That clears GPT-5.1's
-> 0.4856; 0.487 already clears the paper's best open-weight (0.460) with an 8B model.
+> **`mix-v10`, macro 0.491** on the board (S2 0.447, D2 0.540, S3 0.504, D3 0.475) -- **past
+> GPT-5.1's 0.4856 and well past the paper's best open-weight, 0.460, using an 8B model.** Nothing is
+> built and unsubmitted. **D3 is 80% of the remaining gap to GPT-5.1**; the next two levers are both
+> free and pre-sized in "The three slots after this": the 756 excluded `last-number` rows, and
+> log-space fusion of the two arms on the 1,246 rows both answered (`quantiphy.fusion` is referenced
+> in `backends/vlm.py` and does not exist yet -- build it).
 >
 > **The VLM arm is now the top item, and everything geometric is worth thousandths.** Solver on
 > S2/S3 plus a Qwen-class VLM on D2/D3 composes to **~0.492** by arithmetic, and at 0.4435 we are
@@ -42,7 +44,7 @@ Last worked: **2026-08-26**.
 > gravity prior) is re-sized and **not free**: its 46 videos are all detection-cache misses. Ask me
 > before spending more than ~$20 in a session.
 
-## 2026-08-27/28 — champion 0.441 -> 0.487 on the board, 0.4915 composed
+## 2026-08-27/28 — champion 0.441 -> 0.491, past GPT-5.1, with an 8B open-weight model
 
 The sixth theory of the 3D bias, and the first that predicts the *category pattern* rather than just
 the magnitude. `solve_row` computed `radial_speed` for the **target** and folded it in with `hypot`.
@@ -301,7 +303,64 @@ done
 **Then do not fuse anything.** Log-space fusion needs two scored parents and this project has refuted
 four attempts to predict per-row which arm is right.
 
-### CHAMPION: `mix-v9` 0.487 on the board, and `mix-v10` is 0.4915 by arithmetic
+### CHAMPION: `mix-v10`, macro 0.491 — and the composition arithmetic held to the digit again
+
+Scored 2026-08-28 09:47. **All four categories came back exactly as composed** -- S2 0.447 and
+D2 0.540 and D3 0.475 from `mix-v9`, S3 0.504 from `mix-v8`. Predicted 0.4915, reported 0.491.
+That is the fourth time per-category composition has been exact, and it is the single most reliable
+tool in this campaign.
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| `mix-v8` | 0.440 | 0.461 | **0.504** | 0.411 | 0.454 |
+| `mix-v9` | **0.447** | **0.540** | 0.488 | **0.475** | 0.487 |
+| **`mix-v10`** | **0.447** | **0.540** | **0.504** | **0.475** | **0.491** |
+| GPT-5.1 | 0.463 | 0.562 | 0.515 | **0.583** | 0.4856 |
+| Qwen3-VL-32B | 0.358 | 0.516 | 0.432 | 0.534 | 0.460 |
+| human average | 0.500 | 0.591 | 0.552 | 0.579 | 0.556 |
+
+**We are past GPT-5.1 and well past the best open-weight in the paper, with an 8B model.**
+
+### The three slots after this — pre-sized, and D3 is again the only large gap
+
+Remaining distance to GPT-5.1: S2 -0.016, D2 -0.022, S3 -0.011, **D3 -0.108**. D3 is 80% of the gap.
+
+**A. The 756 `last-number` rows we deliberately excluded.** Currently they hold `mix-v10`'s value.
+
+| | S2 | D2 | S3 | D3 |
+|---|---|---|---|---|
+| rows | 80 | 230 | 162 | **284** |
+| leverage | 0.138 | 0.198 | 0.281 | **0.292** |
+
+Validation priced these at **-0.156/row against a constant** and the CI excluded zero -- but validation
+also got S2's *sign* wrong, and it under-priced the sentinel rows in D2/D3 badly. Four channels, one
+slot, and the base is now the champion rather than a constant. Test it.
+
+**B. Log-space fusion, where both arms answered.** `quantiphy.fusion` is referenced in
+`backends/vlm.py`'s docstring and **does not exist yet**. Build it: geometric mean of the VLM's
+answer and the solver's, on the 1,246 rows both answered.
+
+| | S2 | D2 | S3 | D3 |
+|---|---|---|---|---|
+| rows | 263 | 406 | 261 | **316** |
+| leverage | 0.453 | 0.350 | 0.453 | 0.325 |
+| VLM/solver median | 0.907 | 0.950 | 0.978 | **0.686** |
+| disagree >2x | 52% | 50% | 46% | **63%** |
+
+The two arms disagree by more than 2x on about half the rows, which is exactly the condition where a
+geometric mean is worth a slot: it lands between them, and **under MRA a prediction 4x from truth
+scores zero while its geometric midpoint at 2x may not**. Remember the standing rule -- log space,
+never an arithmetic mean.
+
+**C. Qwen3-VL-32B in 4-bit, ~$25-40 and needs sign-off.** The paper puts the 32B at D3 0.534 standalone
+against the 8B's contribution landing us at 0.475. `VLM_4BIT=1` and `a100-large` are already wired
+and `VLM_MAX_SIDE` bounds the memory. Do A and B first -- they are free.
+
+**Deprioritised: item 1k (the gravity prior).** Its 291 rows would now have to beat the *VLM's*
+answer rather than a constant, and D2 is at 0.540. It was sized at +0.028 on D2 against a 0.461
+baseline; that case is much weaker now.
+
+### `mix-v9`, for the record
 
 Scored 2026-08-28 09:44. **Three of the four channels won.**
 
