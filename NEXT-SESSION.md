@@ -153,6 +153,38 @@ puts chain-of-thought at 56.1 -> 27.7, 49.8 -> 22.4, 50.1 -> 23.1 against video+
 halves MRA for every strong model. `brief` (mild CoT) stays the default so a resumed run stays
 comparable with its own checkpoint. An unknown style raises before the model loads.
 
+### The full test pass is far cheaper than the old estimate — measure it, then run it
+
+Measured on `l4x1`, Qwen3-VL-8B in bf16 at 12 frames: **`direct` runs 3.3 s/row and `brief` 8.3 s/row.**
+The reasoning tokens cost 2.5x the wall clock, so the prompt A/B decides the bill as well as the
+score. Over the 3,289 test rows:
+
+| prompt | GPU-hours | 4 shards, each | rough cost at ~$0.80/h for `l4x1` |
+|---|---|---|---|
+| `direct` | 3.0 | ~45 min | **~$2.50** |
+| `brief` | 7.6 | ~1.9 h | ~$6 |
+
+So the "~$20-40" in item 6 is wrong by roughly an order of magnitude, and the arm is affordable to
+re-run whenever the prompt changes. Add 2-3 minutes per shard for the install and the 15 GB model
+download. Launch with the winning style:
+
+```bash
+export PYTHONIOENCODING=utf-8            # or the upload bar's block character kills the client
+for K in 1 2 3 4; do
+  hf jobs uv run --detach --flavor l4x1 --timeout 4h --secrets HF_TOKEN \
+    -e QUANTIPHY_GIT=git+https://github.com/prarabdhmisra/quantiphy.git@fix/prior-grounding-phrase \
+    -e OUTPUT_REPO=prarabdhmisra/quantiphy-runs -e SPLIT=test \
+    -e VLM_MODEL=Qwen/Qwen3-VL-8B-Instruct -e VLM_PROMPT=<winner> \
+    -e SHARD=$K/4 -e RUN_NAME=test-vlm-qwen3vl8b-<winner>-shard$K \
+    scripts/run_vlm_job.py
+done
+```
+
+**Then do not fuse anything.** Turn the VLM run into its own submission, spend one slot on it, and
+*select per category* against `mix-v8` -- that composition is arithmetic once both are scored, and
+this project has refuted four attempts to predict per-row which arm is right. Log-space fusion is a
+later question and it needs two scored parents first.
+
 `scripts/score_vlm.py` (new) re-parses `vlm_raw.jsonl` rather than trusting the run's own
 `parsed_value`, scores against validation truth, and compares two runs on the *intersection* of rows
 both answered with a paired bootstrap.
@@ -1306,7 +1338,7 @@ In priority order, by measured evidence rather than by hunch:
 | 3 | Kill the fatal overshoots: gate on prior confidence | — | free | The `pedestrian walking` prior scored 0.341 with box width jittering 13–59 px and produced 7x overshoots. `min_confidence` already exists and is unused (`solve_row` defaults it to 0.0). Now that `detection_rate` is fixed, confidence is finally meaningful. |
 | 4 | Decide on `fix/prior-grounding-phrase` | 412 | free | Real defects, 114 tests green, but it did **not** move the metric. Merge on correctness grounds, not on a score claim. |
 | ~~5~~ | ~~Full 159-row validation run on `l4x1`~~ | — | done | **LAUNCHED 2026-08-27** as the VLM prompt A/B (`brief` vs `direct`), two runs of 159 rows on `l4x1` with Qwen3-VL-8B. Read the result with `scripts/score_vlm.py`. |
-| **6 (TOP)** | **The VLM arm on D2/D3** | **2,132** | ~$20–40 GPU | **PROMOTED TO TOP 2026-08-27, and it is the only lever left that is worth more than a thousandth.** Not a fallback for declined rows -- a *second arm*, selected per category. Solver on S2/S3 plus a Qwen-class VLM on D2/D3 composes to **~0.492** against the champion's 0.4435, and per-category composition is arithmetic once both parents are scored. Gated on the prompt A/B in item 5. |
+| **6 (TOP)** | **The VLM arm on D2/D3** | **2,132** | **~$3–6 GPU, measured** | **PROMOTED TO TOP 2026-08-27, and it is the only lever left that is worth more than a thousandth.** Not a fallback for declined rows -- a *second arm*, selected per category. Solver on S2/S3 plus a Qwen-class VLM on D2/D3 composes to **~0.492** against the champion's 0.4435, and per-category composition is arithmetic once both parents are scored. Gated on the prompt A/B in item 5. |
 | 7 | SAM2 masks / CoTracker3 | — | ~$10 GPU | **Deprioritised twice over.** The billiard box is already tight and correct; masks would not have helped. |
 | 7b | Depth-proxy for rows whose target has no `depth_info` entry | ~60 | free | **Do not oversell this one** — see "The depth hypothesis is also refuted" below. Worth ~60 tail rows, not the 762 it first appeared to be. |
 | 8 | Follow-up email; `--shrink` measurement | — | free | Parked / needs (5). |
