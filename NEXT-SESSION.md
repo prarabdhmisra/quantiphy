@@ -22,9 +22,9 @@ Last worked: **2026-08-26**.
 > `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
 > https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (241 tests
 > green). **The portal is live and scores on upload, 3/day — read "Submitting".** Champion is
-> **`mix-v7`, macro 0.4435**; **`mix-v8` is built, validated and unsubmitted** — it carries the
-> 2026-08-27 D3 fix on 240 rows plus an S3 cleanup on 41, with S2 and D2 as bit-identical controls
-> that must come back at 0.440 and 0.461. The board's best is still `mix-v5` at 0.441.
+> **`mix-v8`, macro 0.454**, scored on the board 2026-08-27 (S2 0.440, D2 0.461, S3 0.504, D3 0.411).
+> Both of its experiments won and both of its controls returned to the digit. **S2 and D2 have been
+> untouched for three submissions and are the two free channels** for the next probe.
 >
 > **The VLM arm is now the top item, and everything geometric is worth thousandths.** Solver on
 > S2/S3 plus a Qwen-class VLM on D2/D3 composes to **~0.492** by arithmetic, and at 0.4435 we are
@@ -41,7 +41,7 @@ Last worked: **2026-08-26**.
 > gravity prior) is re-sized and **not free**: its 46 videos are all detection-cache misses. Ask me
 > before spending more than ~$20 in a session.
 
-## 2026-08-27 — the radial correction was only ever applied to one of the two objects
+## 2026-08-27 — champion 0.4435 -> 0.454, and D3 is no longer closed to the solver
 
 The sixth theory of the 3D bias, and the first that predicts the *category pattern* rather than just
 the magnitude. `solve_row` computed `radial_speed` for the **target** and folded it in with `hypot`.
@@ -94,7 +94,32 @@ same rows, and it separates populations a single threshold averages together:
 | S3 `geometric-3d+target-from-prior` | 16 | 0.14 | **0.0%** |
 | S3 `geometric-2d+separation` | 12 | 0.21 | 16.7% (**50% are >100x**) |
 
-### `mix-v8.submission.csv` — BUILT, VALIDATED, NOT YET SUBMITTED
+### CHAMPION: `mix-v8`, macro 0.454 — BOTH experiments won and BOTH controls came back exact
+
+Scored 2026-08-27 21:12. `pass`, invalid 0.0%, 3,289 matched, 0 missing.
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| `mix-v5` (the board's old best) | 0.430 | 0.461 | 0.477 | 0.396 | 0.441 |
+| `mix-v7` (offline champion) | 0.440 | 0.461 | 0.477 | 0.396 | 0.4435 |
+| **`mix-v8`** | **0.440** | **0.461** | **0.504** | **0.411** | **0.454** |
+
+**S2 and D2 returned 0.440 and 0.461 to the digit**, which is the control passing: per-category
+composition is arithmetic, again, and the two changed channels are reading only their own change.
+
+Inverting `delta(C) = (rows changed / category rows) * delta per row`:
+
+* **S3: +0.027 on 37 of 576 rows = +0.420 per row.** Those 37 rows were scoring essentially *zero*
+  and the constant scores ~0.41. Reverting a degenerate route is worth almost a whole point per row.
+* **D3: +0.015 on 174 of 972 rows = +0.084 per row.**
+
+**D3 is no longer closed to the solver, and that is the headline.** The standing anchor was that D3
+solver rows within 5x of the constant score 0.374 against its 0.396 -- **-0.022/row**. The same kind
+of population, with the prior's radial component removed, is now **+0.084/row**. The fix is worth
+about **+0.106 per row** on the rows it touches, and it converted a category the campaign had
+formally closed into one that pays.
+
+### `mix-v8.submission.csv` — as built (superseded by the result above)
 
 Two experiments and two controls in one slot. **S2 and D2 are bit-identical to `mix-v7`, so the
 portal must return 0.440 and 0.461 for them** or the composition arithmetic is wrong.
