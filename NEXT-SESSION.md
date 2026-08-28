@@ -300,6 +300,18 @@ done
 **Then do not fuse anything.** Log-space fusion needs two scored parents and this project has refuted
 four attempts to predict per-row which arm is right.
 
+### IN FLIGHT as of 2026-08-28 01:25 UTC — four test shards
+
+`test-vlm-qwen3vl8b-brief-shard1..4`, `l4x1`, Qwen3-VL-8B, `VLM_PROMPT=brief`, 12 frames,
+`max_side=768`. Job ids `6a90e38a45686a1580c102a3`, `6a90e38c45686a1580c102a5`,
+`6a90e38f45686a1580c102a7`, `6a90e392984507d9db4e93c9`. ~822 rows each at 6-10 s/row, so 1.5-2.5 h.
+Shard 2 sat queued for a GPU at launch (`RUNNING` with `0s` runtime) and will simply finish later.
+
+**They checkpoint every 25 rows and resume by row index**, so a dead shard is relaunched with the
+same `RUN_NAME` and picks up where it stopped. Check with `hf jobs ps -a`; read a partial run with
+`scripts/vlm_predictions.py`, which emits every dataset row and marks the unreached ones
+`row never attempted` so a partial pass can never silently look complete.
+
 ### The composition to build when the shards land — one slot, four independent experiments
 
 The obvious move is a *pure* VLM submission, to read its four category numbers and then select per
