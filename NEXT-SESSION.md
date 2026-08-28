@@ -183,6 +183,39 @@ once the VLM has its own scored test submission.
 Worth knowing for the composition: **those fallback rows should take the *solver's* answer, not the
 constant**, since the solver beats the constant in S2, D2 and S3. That is free once both are scored.
 
+### The parse route is a quality signal, and it is the one the VLM arm should be selected on
+
+Free, from replies already paid for, and it answers an open question in `prompting.py`'s own
+docstring. `parse_answer` falls back to "the last number in the reply" when the model drops the
+`ANSWER:` marker, and that docstring says the fallback is "genuinely useful ... but it also happily
+picks up a number from the reasoning". **The second half dominates.** Per row, against the
+`(category, unit)` median constant, over the 117 answered validation rows:
+
+| route | n | VLM | constant | delta/row | 95% CI |
+|---|---|---|---|---|---|
+| `vlm-sentinel` | 75 | 0.536 | 0.439 | **+0.097** | [-0.012, +0.205] |
+| `vlm-last-number` | 42 | 0.281 | 0.436 | **-0.156** | **[-0.293, -0.021]** |
+| all answered | 117 | 0.444 | 0.438 | +0.007 | — |
+
+So **the VLM as a whole barely beats a constant, while the half of it that follows the output format
+beats it clearly and the half that does not is measurably worse.** A model that will not emit the
+marker it was told to emit is hedging, and its number should not be used.
+
+Read the significance honestly: only the **negative** has a CI excluding zero. The sentinel row's
++0.097 does not, at n=75. But the negative is the actionable half, it has a mechanism, and dropping
+those rows is the conservative move rather than the aggressive one.
+
+**Not a category artifact.** The `last-number` rows are spread 11/12/5/14 across D2/D3/S2/S3, and the
+constant scores 0.436 on them against 0.439 on the sentinel rows -- the two populations are equally
+hard by the constant's own measure.
+
+Restricted to **D2+D3, where the arm is actually meant to be used**, the split is starker still:
+sentinel rows score **0.609** against the constant's 0.440, and all-answered rows only 0.484.
+
+**So compose with `method_ids.py --contains sentinel`,** not with every answered row. And note the
+159-row split has refuted three levers that looked real in-sample -- confirm this one on test before
+treating it as settled.
+
 ### The full test pass is far cheaper than the old estimate — measure it, then run it
 
 Measured on `l4x1`, Qwen3-VL-8B in bf16 at 12 frames: **`direct` runs 3.3 s/row and `brief` 8.3 s/row.**
