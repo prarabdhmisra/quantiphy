@@ -39,6 +39,15 @@ from quantiphy.prompting import parse_answer  # noqa: E402
 from quantiphy.scoring import CATEGORIES, category_labels, paired_bootstrap, score  # noqa: E402
 
 DEFAULT_REPO = "prarabdhmisra/quantiphy-runs"
+#: The local pinned copy of the organizers' validation split.
+#:
+#: The join is on ``row_index``, which the *job* assigned from the Hub copy after the same
+#: ``ground_truth_posterior.notna()`` filter and ``reset_index``. So the two files must agree row for
+#: row or every answer lands on the wrong question -- a silent 100x of exactly the kind this project
+#: has already paid for once. Verified 2026-08-27: 159 rows each, and ``question``, ``video_id``,
+#: ``video_type``, ``inference_type`` and ``ground_truth_posterior`` are identical *in order*. The
+#: column *sets* differ and that is fine; none of the extra columns is used. Re-check after any
+#: refresh of either file.
 VALIDATION = ROOT / "data" / "fixtures" / "quantiphy_validation.csv"
 
 
