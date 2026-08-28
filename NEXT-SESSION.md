@@ -34,6 +34,115 @@ Last worked: **2026-08-26**.
 > re-derive" and the 2026-08-26 section before proposing a lever. Ask me before spending more than
 > ~$20 in a session.
 
+## 2026-08-27 — the radial correction was only ever applied to one of the two objects
+
+The sixth theory of the 3D bias, and the first that predicts the *category pattern* rather than just
+the magnitude. `solve_row` computed `radial_speed` for the **target** and folded it in with `hypot`.
+It never computed it for the **prior**. But a speed prior states a 3D speed while `prior_pixels`
+recorded only its in-plane projection, so `gamma = prior_world / prior_pixels` was too large by
+`1 / sqrt(1 - (v_r/v)^2)` on every 3D speed-prior row.
+
+That is exactly D3 and nothing else. `D3` is `[dynamic prior][3D]`, so all 972 of its rows carry a
+velocity or acceleration prior *and* a depth track. S3's priors are sizes, so no radial term exists;
+D2 is 2D, so there is no depth to read. **The bug could only ever fire in the one category that
+overshot**, which is why five single-cause theories that ignored the category structure all failed.
+
+**The median prior object spends 62% of its own speed along the camera axis.** This is not a small
+correction, and it is one-way -- it only ever inflated the answer.
+
+### Measured on the 240 rows it fires on, all in D3, with S2/D2/S3 bit-identical
+
+| | median vs the constant | within 2x | over 1.9x (a hard zero) | under 0.1x |
+|---|---|---|---|---|
+| before | 1.235 | 32.9% | **41.7%** | 4.2% |
+| **after** | **0.953** | **39.2%** | **30.0%** | 6.2% |
+
+The rule needs no tuning: apply the decomposition whenever it is physically available (`|v_r| < |v|`)
+and leave `gamma` alone when it is not. That principled rule is also the argmax over every guard
+variant tried, which is the first time on this project that a threshold and a principle have agreed.
+Where `|v_r| >= |v|` the depth readings and the stated prior contradict each other, and emitting the
+near-zero tangential speed would drive `gamma` to 0 and the answer to a hard zero.
+
+### The acceleration version is REFUTED, and pinned by a test
+
+The same decomposition on acceleration priors looks equally justified and is worthless: over the 172
+D3 acceleration-prior rows with three or more timed depth readings, the depth-derived radial
+acceleration is a **median 1.50x the stated total** -- physically impossible for a decomposition,
+because `d2Z/dt2` from two to four readings over a 2-3 s clip is noise. Applying it moved the median
+from 1.07x the constant to 1.90x and doubled the >1.9x share to 50%. `tests/test_solver_pipeline.py`
+pins the negative so it is not re-added.
+
+### Route selection is a partition the campaign had never used
+
+`scripts/method_ids.py` (new, tested): the ids of rows that took a named code path, feeding
+`select_rows.py --overlay-ids`. **"D3 is closed to the solver" was measured over thresholds on
+*disagreement magnitude*, and that finding still holds** -- but route is a different partition of the
+same rows, and it separates populations a single threshold averages together:
+
+| | n | median vs const | within 2x |
+|---|---|---|---|
+| D3 `geometric-3d+radial` | 66 | 0.75 | **51.5%** |
+| D3 `geometric-3d` | 213 | 2.29 | 27.2% |
+| S3 `geometric-3d+radial` | 93 | 0.99 | **77.4%** |
+| S3 `geometric-3d+target-from-prior` | 16 | 0.14 | **0.0%** |
+| S3 `geometric-2d+separation` | 12 | 0.21 | 16.7% (**50% are >100x**) |
+
+### `mix-v8.submission.csv` — BUILT, VALIDATED, NOT YET SUBMITTED
+
+Two experiments and two controls in one slot. **S2 and D2 are bit-identical to `mix-v7`, so the
+portal must return 0.440 and 0.461 for them** or the composition arithmetic is wrong.
+
+* **D3**, 240 of 972 rows: the constant -> the tangentially-corrected solver. First thing to reopen
+  D3. Reads as `delta(D3) = 0.247 * delta(mean score on those rows)`.
+* **S3**, 41 of 576 rows: the solver -> the constant, on the three degenerate routes above. Those
+  are near-certain zeros and the constant scores 0.410 in S3. Reads at `0.071 *  delta`.
+
+### Item 1k (the gravity prior) is NOT free — every one of its videos is a cache miss
+
+Sized before committing to it, and the "free to try" label in the table below was wrong.
+`solve_row` declines a gravity row **before** it ever measures the target, so the detector was never
+run on those target phrases: all **46 videos** behind the 291 rows are absent from the test detection
+cache. The solver change is free; measuring it needs a fresh detection pass over those 46 videos
+(cents, minutes). Fold it into the next GPU session rather than treating it as an offline lever.
+
+The physics for when it is built: a gravity prior fixes no pixel length, but a free-falling target's
+own pixel acceleration does -- `gamma = 9.8 / a_px`. Gate it on the fitted acceleration being
+predominantly **vertical and downward**, which is the signature of free fall and also rejects the
+static targets (a "width of the table" row would divide by a near-zero `a_px` and emit a hard zero).
+
+### The VLM arm ran for the first time, and its installer was broken
+
+`run_vlm_job.py` used `python -m pip`, which does not exist inside `hf jobs uv run` -- so the first
+two launches died in seconds on `No module named pip`. `run_vision_job.py` already carried the
+uv -> pip -> clone ladder *and a comment explaining exactly this*; the VLM arm had the naive version
+because it had never actually run. **Code that has never executed is not code, however well tested**
+-- 241 unit tests said nothing about this.
+
+`VLM_PROMPT=brief|direct` is now a switch rather than a hardcoded string, because the paper's Table 2
+puts chain-of-thought at 56.1 -> 27.7, 49.8 -> 22.4, 50.1 -> 23.1 against video+prior: it roughly
+halves MRA for every strong model. `brief` (mild CoT) stays the default so a resumed run stays
+comparable with its own checkpoint. An unknown style raises before the model loads.
+
+`scripts/score_vlm.py` (new) re-parses `vlm_raw.jsonl` rather than trusting the run's own
+`parsed_value`, scores against validation truth, and compares two runs on the *intersection* of rows
+both answered with a paired bootstrap.
+
+### Why the VLM arm is the only lever that still matters
+
+Every remaining geometric lever is worth 0.005-0.010 on the macro. The arithmetic on the paper's
+Table 1, with our own measured S2/S3:
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| **mix-v7 (champion)** | 0.440 | 0.461 | 0.477 | 0.396 | **0.4435** |
+| Qwen3-VL-32B (paper) | 0.358 | **0.516** | 0.432 | **0.534** | 0.460 |
+| **solver on S2/S3 + a Qwen-class VLM on D2/D3** | 0.440 | 0.516 | 0.477 | 0.534 | **~0.492** |
+
+Per-category composition is *arithmetic* once both parents are scored, so that is not a projection of
+a model's quality -- only of Qwen3-VL-8B reproducing the 32B's D2/D3 within a few points. Note also
+that at 0.4435 we are still **below** the best open-weight number in the paper (0.460), which is the
+number Track B has to beat.
+
 ## 2026-08-26 — three strategies closed, and the champion moved 0.441 -> 0.4435
 
 Three slots, twelve readings, and the day's value was almost entirely in what it ruled out. Two new
@@ -1155,7 +1264,7 @@ In priority order, by measured evidence rather than by hunch:
 | ~~1m~~ | ~~**Set `TRUSTED_PRIOR_PIXELS = (30.0, inf)`**~~ | — | done | **DONE 2026-08-25.** Default changed, its docstring corrected (it used to claim priors over 400 px score a hard zero — the test split says otherwise), and the replay gate now pins `solver-v1`'s own `(30, 300)` beside its numbers so it does not read the live default. 207 tests. |
 | ~~1n~~ | ~~**Try `S3\|cm` rescale on top of solver-v2's S3**~~ | ~~576~~ | done | **CLOSED 2026-08-26.** ×0.5 beyond the champion lost **-0.203 on the group's mean**, so `mix-v4`'s ×0.7 is at or near the argmax after all. Constant-multiplier probing is exhausted generally: 8 group probes over two days, 8 losses. |
 | ~~1j~~ | ~~**Per-category lower edge on the band**~~ | ~~74~~ | done | **HALF ADOPTED 2026-08-26.** Floor 0 in **S2 wins +0.010** (29 rows, adopted into `mix-v7`); in **S3 it loses -0.014** (45 rows, rejected). Both had 0% of rows >100x off -- so **`0% >100x` is not a quality signal**; judge by `within2x`. |
-| **1k (TOP)** | **The gravity prior** — `cannot set pixel scale` | **291** | free to try | Now the largest *remaining* bucket, and all of it is D2 (170) and D3 (121) — the two categories the paper says are our whole gap. A gravity prior gives `g = 9.81 m/s²` with no pixel length, so scale must come from the target's own kinematics; that is a solver change, then a replay. **PROMOTED TO TOP 2026-08-26:** 170 of the 291 are in D2, and D2 is now measured as the category where a solved row is worth the most (+0.19/row, and even its 100x-outliers earn). Sized at roughly **+0.028 on D2**. Every other free lever is closed. |
+| **1k** | **The gravity prior** — `cannot set pixel scale` | **291** | cents, not free | Now the largest *remaining* bucket, and all of it is D2 (170) and D3 (121) — the two categories the paper says are our whole gap. A gravity prior gives `g = 9.81 m/s²` with no pixel length, so scale must come from the target's own kinematics; that is a solver change, then a replay. **PROMOTED TO TOP 2026-08-26:** 170 of the 291 are in D2, and D2 is now measured as the category where a solved row is worth the most (+0.19/row, and even its 100x-outliers earn). Sized at roughly **+0.028 on D2**. Every other free lever is closed. **RE-SIZED 2026-08-27 and it is not free:** `solve_row` declines before it measures the target, so all **46 videos** behind these rows are absent from the detection cache. The solver change is offline; measuring it needs a detection pass over those 46 videos. Physics and the free-fall gate are written up in the 2026-08-27 section. |
 | ~~1h~~ | ~~**Diagnose D3**~~ | ~~972~~ | done | **DONE 2026-08-25.** It is a ~3x *overshoot* rising monotonically with the prior's derivative order, and overshoot scores zero. The fixable part is item 1e. See "D3 diagnosed". |
 | 1b | **Fresh detection pass for the new phrases** | ~183 | cents | The pair fix renames phrases, so those rows are cache misses. Needed before the separation numbers can be scored at scale. |
 | 1c | `distance-twin` — "between the **two cars**", one phrase twice | **44** | free-ish | Declines by design today. Needs the detector to keep its **top-2** boxes per frame, not just the best; `DetectionSeries` holds one. Small, well-defined change to `grounding.py`. |
@@ -1166,8 +1275,8 @@ In priority order, by measured evidence rather than by hunch:
 | ~~1f~~ | ~~Confirm-or-kill the disagreement gate on the test set~~ | ~~all~~ | done | **MEASURED 2026-08-26 and it SPLITS by category.** Reverting rows that disagree with the constant is worth **+0.257/row in D3** and **-0.192/row in D2** -- the solver's D2 outliers are its best rows. Adopted nowhere as a blanket rule; the split itself is the finding. |
 | 3 | Kill the fatal overshoots: gate on prior confidence | — | free | The `pedestrian walking` prior scored 0.341 with box width jittering 13–59 px and produced 7x overshoots. `min_confidence` already exists and is unused (`solve_row` defaults it to 0.0). Now that `detection_rate` is fixed, confidence is finally meaningful. |
 | 4 | Decide on `fix/prior-grounding-phrase` | 412 | free | Real defects, 114 tests green, but it did **not** move the metric. Merge on correctness grounds, not on a score claim. |
-| 5 | Full 159-row validation run on `l4x1` | — | ~1–3 h, $5–15 | **Promoted: this is now the unblocking step.** It has ground truth, so it is what the confidence gate is fitted on. Do this before any full test run. |
-| 6 | Fallback arm (VLM estimate), fused in log space | 325 | ~$5 GPU | More urgent than before: 325 rows now decline by design. |
+| ~~5~~ | ~~Full 159-row validation run on `l4x1`~~ | — | done | **LAUNCHED 2026-08-27** as the VLM prompt A/B (`brief` vs `direct`), two runs of 159 rows on `l4x1` with Qwen3-VL-8B. Read the result with `scripts/score_vlm.py`. |
+| **6 (TOP)** | **The VLM arm on D2/D3** | **2,132** | ~$20–40 GPU | **PROMOTED TO TOP 2026-08-27, and it is the only lever left that is worth more than a thousandth.** Not a fallback for declined rows -- a *second arm*, selected per category. Solver on S2/S3 plus a Qwen-class VLM on D2/D3 composes to **~0.492** against the champion's 0.4435, and per-category composition is arithmetic once both parents are scored. Gated on the prompt A/B in item 5. |
 | 7 | SAM2 masks / CoTracker3 | — | ~$10 GPU | **Deprioritised twice over.** The billiard box is already tight and correct; masks would not have helped. |
 | 7b | Depth-proxy for rows whose target has no `depth_info` entry | ~60 | free | **Do not oversell this one** — see "The depth hypothesis is also refuted" below. Worth ~60 tail rows, not the 762 it first appeared to be. |
 | 8 | Follow-up email; `--shrink` measurement | — | free | Parked / needs (5). |
@@ -1217,7 +1326,7 @@ Re-read any run offline with `py -3.12 scripts/replay_cache.py --run <name>` —
 | | |
 |---|---|
 | Repo | https://github.com/prarabdhmisra/quantiphy (public, MIT) |
-| Tests | **94 on `main`, 207 on the branch** (`py -3.12 -m pytest tests/ -q`) |
+| Tests | **94 on `main`, 241 on the branch** (`py -3.12 -m pytest tests/ -q`) |
 | Plan | `~/.claude/plans/greedy-spinning-hopper.md` (the 60-day campaign, 2026-08-23 → 10-21) |
 | Track | **B (Open-Weight)** primary, A secondary |
 | Deadline | **Plan for Oct 1, 2026** (site advertises Nov 5, but its own timeline finalizes rankings mid-October) |

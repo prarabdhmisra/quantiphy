@@ -3,6 +3,11 @@
 # requires-python = ">=3.10"
 # dependencies = [
 #   "torch",
+#   # Not optional and not obvious: `AutoProcessor.from_pretrained` builds a *video* processor for
+#   # Qwen3-VL even though this backend only ever hands it PIL frames, and Qwen3VLVideoProcessor is
+#   # torchvision-gated. Without it the job dies on `requires the Torchvision library` after the
+#   # whole 62-package install and the model download -- about three minutes of paid GPU per launch.
+#   "torchvision",
 #   "transformers>=4.45",
 #   "accelerate",
 #   "bitsandbytes",
