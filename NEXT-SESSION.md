@@ -27,7 +27,10 @@ Last worked: **2026-08-26**.
 > built and unsubmitted. **D3 is 80% of the remaining gap to GPT-5.1**; the next two levers are both
 > free and pre-sized in "The three slots after this": the 756 excluded `last-number` rows, and
 > log-space fusion of the two arms on the 1,246 rows both answered (`quantiphy.fusion` is referenced
-> in `backends/vlm.py` and does not exist yet -- build it).
+> in `backends/vlm.py`, is now BUILT). **`mix-v11` (the last-number rows) and `mix-v12` (fusion at
+> cap 5) are built, validated and unsubmitted -- submit `mix-v11` first.** Read the fusion section
+> before believing `mix-v12`: the plain geometric mean *loses* to taking the VLM alone, and the
+> capped variant's significance comes from a sweep over the same 60 rows that chose the cap.
 >
 > **The VLM arm is now the top item, and everything geometric is worth thousandths.** Solver on
 > S2/S3 plus a Qwen-class VLM on D2/D3 composes to **~0.492** by arithmetic, and at 0.4435 we are
@@ -321,7 +324,58 @@ tool in this campaign.
 
 **We are past GPT-5.1 and well past the best open-weight in the paper, with an 8B model.**
 
-### The three slots after this — pre-sized, and D3 is again the only large gap
+### BUILT 2026-08-28 and unsubmitted: `mix-v11` and `mix-v12`, both on `mix-v10`
+
+Both validate, 0 blanks, S2/D2/S3/D3 all reading independently against `mix-v10`'s
+0.447 / 0.540 / 0.504 / 0.475.
+
+| | S2 | D2 | S3 | D3 |
+|---|---|---|---|---|
+| **`mix-v11`** the 756 `last-number` rows | 80 (0.138) | 230 (0.198) | 162 (0.281) | 284 (0.292) |
+| **`mix-v12`** log-space fusion, cap 5x | 246 (0.423) | 458 (0.395) | 293 (0.509) | 310 (0.319) |
+
+**Submit `mix-v11` first.** It is the cheaper question with the clearer prior, and its answer feeds
+the fusion one: `last-number` rows are half the fusion input in some categories.
+
+### `quantiphy/fusion.py` — BUILT, and the evidence for it is weak. Read this before believing it.
+
+Measured on the 60 validation rows where the solver answered *and* the VLM answered via its sentinel
+route -- the only data anywhere with both arms and ground truth:
+
+| estimator | MRA | vs VLM alone | 95% CI |
+|---|---|---|---|
+| solver alone | 0.4667 | | |
+| **VLM alone** | **0.5033** | | |
+| geometric mean | 0.4767 | **-0.027** | [-0.125, +0.063] |
+| min of the two | 0.5250 | +0.022 | [-0.038, +0.082] |
+| geo, capped at 5x | 0.5617 | +0.058 | [+0.007, +0.110] |
+
+**The plain geometric mean LOSES to simply taking the VLM.** The premise is only half true: truth
+lies *between* the two arms on **46.7%** of those rows, so averaging converts one winner and one
+loser into two losers about as often as it brackets the answer.
+
+**The capped variant is the only one whose interval excludes zero, and its significance is
+contaminated** -- 5.0 was the argmax of a six-point sweep over those same 60 rows. This project has
+been burned by exactly that three times ("taking the best of several LOO numbers is biased upward").
+So `mix-v12` is a genuine coin flip, unlike `mix-v9`, which had a strong prior and delivered.
+
+**The one mechanism that is real is the overshoot rate.** Fatal overshoots (>1.9x truth, a hard zero)
+run at 20% for the solver, 15% for the VLM, and **5% for the minimum of the two** -- you can only
+overshoot if both arms do. That is why `--prefer-lower` exists and is worth its own channel later; it
+is a consequence of "overshoot is fatal, undershoot is cheap", not a fitted parameter.
+
+`scripts/fuse_predictions.py` takes the cap and the primary arm **per category** and requires every
+category to be named, so a channel can never fall through to a default nobody chose. A cap of 1.0 is
+the no-fusion control. `mix-v12` uses cap 5 in all four with the primary set to whichever arm the
+portal measured better there (VLM in S2/D2/D3, solver in S3): one hypothesis, four replications,
+which is worth more than a cap sweep until fusion is shown to work at all.
+
+**One caveat on `mix-v12`'s S2.** Its solver input is `replay-tangential.csv` at band `(30, inf)`,
+while `mix-v10`'s S2 came from `solver-v4` at the S2 floor of 0. So the fused S2 number blends the VLM
+with a slightly different solver answer than the champion holds. It does not invalidate the channel,
+but a null there should not be over-read.
+
+### The slots after those — D3 is still the only large gap
 
 Remaining distance to GPT-5.1: S2 -0.016, D2 -0.022, S3 -0.011, **D3 -0.108**. D3 is 80% of the gap.
 

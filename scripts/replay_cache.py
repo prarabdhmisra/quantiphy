@@ -359,11 +359,25 @@ def main() -> int:
     print("-" * len(header))
 
     ratios: list[float] = []
+    records: list[dict] = []
     for index, row in frame.iterrows():
         request = build_request(row)
         answer = solve_row(request, backend, f"cache/{row['video_id']}.mp4")
         truth = float(row["ground_truth_posterior"])
         prior = request.scale_prior
+
+        # Same schema the test branch writes, so a validation replay feeds the same instruments --
+        # and this is the *only* replay with ground truth, which makes it the only one that can
+        # settle a question like "does fusing two arms beat picking one" without buying a slot.
+        records.append({
+            "row_index": index, "video_id": row["video_id"], "question": row["question"],
+            "video_type": row["video_type"], "inference_type": row["inference_type"],
+            "parsed_value": answer.value if answer.solved else None,
+            "method": answer.method, "reason": answer.reason,
+            "confidence": answer.confidence,
+            "prior_pixels": answer.prior_pixels, "target_pixels": answer.target_pixels,
+            "ground_truth_posterior": truth,
+        })
 
         if not answer.solved:
             print(f"{index:2d} {'-':>7} {'-':>10} {truth:10.4g} {'':9} {'':9} {'':6} {'':10}  "
@@ -397,6 +411,10 @@ def main() -> int:
             print(f"    {video}  {phrase!r}")
         print("Expected after a change to object phrases: the key moved, so these need a fresh\n"
               "detection pass before they can be scored again.")
+
+    if args.out:
+        pd.DataFrame(records).to_csv(args.out, index=False, encoding="utf-8")
+        print(f"\n-> {args.out}  (carries ground_truth_posterior, unlike a test replay)")
     return 0
 
 
