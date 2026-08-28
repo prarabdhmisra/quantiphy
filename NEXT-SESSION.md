@@ -153,6 +153,36 @@ puts chain-of-thought at 56.1 -> 27.7, 49.8 -> 22.4, 50.1 -> 23.1 against video+
 halves MRA for every strong model. `brief` (mild CoT) stays the default so a resumed run stays
 comparable with its own checkpoint. An unknown style raises before the model loads.
 
+### The A/B: CoT does NOT collapse here, and the D3 number is the whole reason to keep going
+
+159 validation rows, Qwen3-VL-8B, 12 frames, both prompts:
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| **`brief`** (mild CoT) | 0.3875 | 0.4649 | 0.4791 | **0.5234** | **0.4637** |
+| `direct` (no reasoning) | 0.3781 | 0.4405 | 0.4116 | 0.5149 | 0.4363 |
+| *our solver, on **test*** | *0.440* | *0.461* | *0.477* | *0.396* | *0.4435* |
+
+Paired bootstrap, `direct` against `brief`: delta **-0.027**, 95% CI **[-0.088, +0.032]**,
+P(no improvement) 0.813. **Not significant, so the paper's Table 2 CoT collapse does not reproduce**
+for this model at this prompt -- and the point estimate leans the other way. `brief` stays the
+default; the switch stays, because it was a real question and is now a measured one.
+
+**The finding that justifies the whole arm: VLM D3 = 0.5234 against our 0.396.** That is within a
+point of the paper's Qwen3-VL-32B D3 of 0.534, so the 8B reproduces the 32B where it matters. S2 we
+win outright (0.440 vs 0.388) and S3 is a tie.
+
+**Read all of that as a go/no-go and nothing finer.** These are *validation* numbers against our
+*test* numbers -- different splits -- and the per-category n is 32-47 rows, which is far below what
+this project has repeatedly established the 159-row split can resolve. The composition is only real
+once the VLM has its own scored test submission.
+
+**26% of `brief`'s rows fell back, and 38 of those 42 are the model answering literally zero** --
+"the ball is stationary, so its velocity is zero", "height cannot be determined without a reference".
+`parse_answer` correctly declines a zero (it would be a hard zero) and the constant fills the row.
+Worth knowing for the composition: **those fallback rows should take the *solver's* answer, not the
+constant**, since the solver beats the constant in S2, D2 and S3. That is free once both are scored.
+
 ### The full test pass is far cheaper than the old estimate — measure it, then run it
 
 Measured on `l4x1`, Qwen3-VL-8B in bf16 at 12 frames: **`direct` runs 3.3 s/row and `brief` 8.3 s/row.**
