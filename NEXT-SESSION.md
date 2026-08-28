@@ -99,10 +99,33 @@ same rows, and it separates populations a single threshold averages together:
 Two experiments and two controls in one slot. **S2 and D2 are bit-identical to `mix-v7`, so the
 portal must return 0.440 and 0.461 for them** or the composition arithmetic is wrong.
 
-* **D3**, 240 of 972 rows: the constant -> the tangentially-corrected solver. First thing to reopen
-  D3. Reads as `delta(D3) = 0.247 * delta(mean score on those rows)`.
-* **S3**, 41 of 576 rows: the solver -> the constant, on the three degenerate routes above. Those
-  are near-certain zeros and the constant scores 0.410 in S3. Reads at `0.071 *  delta`.
+* **D3**, 174 of 972 rows: the constant -> the tangentially-corrected solver, **gated at 5x of the
+  constant**. Reads as `delta(D3) = 0.179 * delta(mean score on those rows)`. First thing to reopen
+  D3.
+* **S3**, 41 of 576 rows (37 actually move): the solver -> the constant, on the three degenerate
+  routes above. Near-certain zeros, and the constant scores 0.410 in S3. Reads at `0.071 * delta`.
+
+**The gate is not a tuning knob and the first build was wrong without it.** Overlaying all 240
+corrected rows would have carried 6.2% of them under 0.1x of the constant and 30.0% over 1.9x --
+both hard zeros, replacing rows that were already collecting the constant's ~0.40. That is knowingly
+including the rows the 2026-08-26 clip priced at **-0.257/row** in D3. Gating at 5x combines the two
+measured findings instead of setting one against the other:
+
+| | n | median | within 2x | >1.9x | <0.1x |
+|---|---|---|---|---|---|
+| ungated | 240 | 0.953 | 39.2% | 30.0% | 6.2% |
+| **within 5x** | **174** | **0.831** | **54.0%** | **18.4%** | **0.0%** |
+
+Built by clipping the replay (`clip_disagreement.py --clip D3=5`) rather than with a bespoke id list:
+`mix-v7`'s D3 is the *pure* constant, so every unoverlaid D3 row sits at ratio exactly 1.0 and can
+never be clipped, which makes a category-wide clip exactly the gate wanted. Clipped rows return as
+`method=none` and `method_ids.py` already drops those.
+
+**The prediction to beat is 0.374, not 0.396.** The 2026-08-26 anchor is that D3 solver rows within 5x
+of the constant score 0.374 against its 0.396. This population is that same gate *plus* the bias
+correction, so it should be strictly better than 0.374; whether it clears 0.396 is what the slot buys.
+Do not read a null as refuting the fix — the fix is a correctness claim measured on 240 rows, and this
+is a question about whether a de-biased geometric answer can beat a constant in D3 at all.
 
 ### Item 1k (the gravity prior) is NOT free — every one of its videos is a cache miss
 
