@@ -152,6 +152,35 @@ correction, so it should be strictly better than 0.374; whether it clears 0.396 
 Do not read a null as refuting the fix — the fix is a correctness claim measured on 240 rows, and this
 is a question about whether a de-biased geometric answer can beat a constant in D3 at all.
 
+### What is left in the champion, measured against the constant — the next probe, pre-sized
+
+Measure the *champion* against the constant, not the replay: three compositions sit between them and
+reasoning through those is how a channel turns into a silent no-op. `mix-v8` vs `baseline-v3`:
+
+| cat | rows | already == const | >5x | >10x | >20x | >100x |
+|---|---|---|---|---|---|---|
+| S2 | 581 | 55 | 167 | 92 | 71 | **42** |
+| D2 | 1160 | 297 | 241 | 139 | 75 | 21 |
+| S3 | 576 | 141 | 110 | **44** | **13** | 5 |
+| D3 | 972 | 798 | **0** | 0 | 0 | 0 |
+
+**D3 has nothing left to clip** -- the 5x gate already did it, which is why that channel is empty.
+
+Against what is already measured, only two of these are worth a channel:
+
+* **S2 >100x, 42 rows, leverage 0.072.** Untested. A row 100x from the constant in a category where
+  the constant scores 0.337 is a near-certain zero, so this can only fail if the constant is *also*
+  wrong there. The nearest prior is S3's +0.420/row today on a route with a 50% >100x rate.
+* **S3 >20x, 13 rows (0.023) or >10x, 44 rows (0.076).** S3 >10x measured +0.161/row on 2026-08-26.
+
+**Do NOT clip D2.** Measured 2026-08-26: >10x is **-0.192/row** because the solver's D2 outliers are
+its *most* valuable rows, and >100x came back at -0.002. Leave it as the control it has been for
+three submissions; its real lever is the 297 declined rows and the VLM.
+
+Expect **+0.003 to +0.008 macro each** -- worth a spare channel, not worth a slot of their own, and
+much smaller than the VLM arm. Build with `select_rows.py --base mix-v8 --overlay baseline-v3` and an
+id list of the rows past the threshold.
+
 ### Item 1k (the gravity prior) is NOT free — every one of its videos is a cache miss
 
 Sized before committing to it, and the "free to try" label in the table below was wrong.
