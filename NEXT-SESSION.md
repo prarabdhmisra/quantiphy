@@ -300,7 +300,42 @@ done
 **Then do not fuse anything.** Log-space fusion needs two scored parents and this project has refuted
 four attempts to predict per-row which arm is right.
 
-### IN FLIGHT as of 2026-08-28 01:25 UTC — four test shards
+### `mix-v9.submission.csv` — BUILT AND VALIDATED 2026-08-28, NOT YET SUBMITTED
+
+The four test shards finished clean: 822 + 822 + 823 + 822 = **3,289 rows, full coverage**, no OOM
+and no per-row exception recorded. `vlm-v1.predictions.csv` and `vlm-v1.submission.csv` are committed
+beside it.
+
+The VLM answered **2,375 of 3,289 (72.2%)** -- 1,619 via the sentinel and 756 via last-number -- and
+declined 914, of which **845 are the model answering literally zero**. That is 26% of the split,
+matching the 24% seen on validation, so the zero-answer habit is a stable property of this model and
+not a small-sample artifact.
+
+`mix-v9` overlays **only the 1,619 sentinel rows** onto `mix-v8`. 1,606 rows actually change value.
+
+| cat | rows | overlaid | leverage | `mix-v8` | median VLM / `mix-v8` | disagree >2x |
+|---|---|---|---|---|---|---|
+| S2 | 581 | 306 | **0.527** | 0.440 | 0.816 | 56% |
+| D2 | 1160 | 563 | **0.485** | 0.461 | 0.933 | 56% |
+| S3 | 576 | 297 | **0.516** | 0.504 | 1.024 | 50% |
+| D3 | 972 | 453 | **0.466** | 0.411 | 1.019 | 54% |
+
+**Read the leverage before reading the result.** These channels are 0.47-0.53, against `mix-v8`'s
+0.179 and 0.064 -- so each category will move several times further than anything the campaign has
+probed, in whichever direction it moves. The VLM disagrees with the champion by more than 2x on about
+half the overlaid rows, so this is not a refinement, it is a different answer on half the board.
+
+That is the right shape of experiment anyway, because **each category still reads independently** and
+the composition afterwards is arithmetic:
+
+    delta(C) = leverage(C) * (VLM per row - mix-v8 per row)
+
+So the downside of a channel losing is one slot, not a worse champion: take `mix-v8`'s value back for
+that category with `select_sources.py`. Expected from validation, and therefore weak: **positive in
+D2 and D3, negative in S2 and S3.** If S2 and S3 do come back down, compose solver-on-static with
+VLM-on-dynamic and that is the split the paper predicted from the start.
+
+### The shards, for the record
 
 `test-vlm-qwen3vl8b-brief-shard1..4`, `l4x1`, Qwen3-VL-8B, `VLM_PROMPT=brief`, 12 frames,
 `max_side=768`. Job ids `6a90e38a45686a1580c102a3`, `6a90e38c45686a1580c102a5`,
