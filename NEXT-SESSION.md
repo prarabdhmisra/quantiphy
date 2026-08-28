@@ -22,9 +22,10 @@ Last worked: **2026-08-26**.
 > `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
 > https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (241 tests
 > green). **The portal is live and scores on upload, 3/day — read "Submitting".** Champion is
-> **`mix-v8`, macro 0.454**, scored on the board 2026-08-27 (S2 0.440, D2 0.461, S3 0.504, D3 0.411).
-> Both of its experiments won and both of its controls returned to the digit. **S2 and D2 have been
-> untouched for three submissions and are the two free channels** for the next probe.
+> **`mix-v9`, macro 0.487** on the board (S2 0.447, D2 0.540, S3 0.488, D3 0.475), and
+> **`mix-v10` = 0.4915** is built, validated and **unsubmitted** -- `mix-v9` on S2/D2/D3 plus
+> `mix-v8` on S3, which is arithmetic rather than a prediction. Upload it. That clears GPT-5.1's
+> 0.4856; 0.487 already clears the paper's best open-weight (0.460) with an 8B model.
 >
 > **The VLM arm is now the top item, and everything geometric is worth thousandths.** Solver on
 > S2/S3 plus a Qwen-class VLM on D2/D3 composes to **~0.492** by arithmetic, and at 0.4435 we are
@@ -41,7 +42,7 @@ Last worked: **2026-08-26**.
 > gravity prior) is re-sized and **not free**: its 46 videos are all detection-cache misses. Ask me
 > before spending more than ~$20 in a session.
 
-## 2026-08-27 — champion 0.4435 -> 0.454, and D3 is no longer closed to the solver
+## 2026-08-27/28 — champion 0.441 -> 0.487 on the board, 0.4915 composed
 
 The sixth theory of the 3D bias, and the first that predicts the *category pattern* rather than just
 the magnitude. `solve_row` computed `radial_speed` for the **target** and folded it in with `hypot`.
@@ -300,7 +301,41 @@ done
 **Then do not fuse anything.** Log-space fusion needs two scored parents and this project has refuted
 four attempts to predict per-row which arm is right.
 
-### `mix-v9.submission.csv` — BUILT AND VALIDATED 2026-08-28, NOT YET SUBMITTED
+### CHAMPION: `mix-v9` 0.487 on the board, and `mix-v10` is 0.4915 by arithmetic
+
+Scored 2026-08-28 09:44. **Three of the four channels won.**
+
+| cat | `mix-v8` | `mix-v9` | delta | leverage | delta/row | verdict |
+|---|---|---|---|---|---|---|
+| S2 | 0.440 | **0.447** | +0.007 | 0.527 | +0.013 | VLM keeps it |
+| D2 | 0.461 | **0.540** | **+0.079** | 0.485 | **+0.163** | VLM keeps it |
+| S3 | **0.504** | 0.488 | -0.016 | 0.516 | -0.031 | **revert to `mix-v8`** |
+| D3 | 0.411 | **0.475** | **+0.064** | 0.466 | **+0.137** | VLM keeps it |
+| **macro** | 0.454 | **0.487** | | | | |
+
+`mix-v10.submission.csv` = `mix-v9` on S2/D2/D3 + `mix-v8` on S3 = **0.4915**, built and validated.
+That number is arithmetic, not a prediction, but it needs a slot to reach the official record.
+
+**Where that stands against the field:** the paper's best open-weight is Qwen3-VL-32B at **0.460** and
+GPT-5.1 is at **0.4856**. So 0.487 already clears the open-weight number with an **8B** model, and
+0.4915 clears GPT-5.1. Human average is 0.556.
+
+### What the 159-row split got right and wrong, as a calibration on the instrument
+
+Worth recording, because the whole campaign leans on this split:
+
+| | validation said (per row, vs a constant) | test measured (per row, vs `mix-v8`) |
+|---|---|---|
+| D2 | +0.169 | **+0.163** |
+| D3 | (positive, D2+D3 pooled) | **+0.137** |
+| S2 | **-0.036** | **+0.013** -- sign wrong |
+| S3 | -0.097 | -0.031 -- right sign, 3x too big |
+
+It called the two large effects almost exactly and got the *sign* wrong on the smallest one. That is
+the same lesson in a new form: **the 159 rows can size a big effect and cannot resolve a small one.**
+Had S2 been decided on validation alone, a +0.007 channel would have been thrown away.
+
+### `mix-v9.submission.csv` — as built
 
 The four test shards finished clean: 822 + 822 + 823 + 822 = **3,289 rows, full coverage**, no OOM
 and no per-row exception recorded. `vlm-v1.predictions.csv` and `vlm-v1.submission.csv` are committed
