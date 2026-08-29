@@ -1,6 +1,6 @@
 # Resume here
 
-Last worked: **2026-08-26**.
+Last worked: **2026-08-29**.
 
 > **THE PORTAL IS LIVE.** The single most important thing on this page. Submissions are scored on
 > upload and return a per-category MRA immediately, 3 per UTC day. Everything below that says
@@ -8,9 +8,9 @@ Last worked: **2026-08-26**.
 > on the board before spending anything on GPU.
 
 > **Where things live.** This document is on both branches and is accurate on both. The *code* from
-> 2026-08-05 onward is only on **`fix/prior-grounding-phrase`** (pushed, 207 tests green) —
+> 2026-08-05 onward is only on **`fix/prior-grounding-phrase`** (pushed, 286 tests green) —
 > `main` is deliberately still at the last *measured* state, 94 tests. Anything below that names
-> `scripts/replay_cache.py`, `scripts/select_rows.py` or 207 tests needs that branch checked out:
+> `scripts/replay_cache.py`, `scripts/select_rows.py` or 286 tests needs that branch checked out:
 >
 > ```bash
 > git checkout fix/prior-grounding-phrase
@@ -20,32 +20,141 @@ Last worked: **2026-08-26**.
 
 > Resuming the QuantiPhy Challenge (NeurIPS 2026). Read
 > `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
-> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (241 tests
+> https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (286 tests
 > green). **The portal is live and scores on upload, 3/day — read "Submitting".** Champion is
-> **`mix-v10`, macro 0.491** on the board (S2 0.447, D2 0.540, S3 0.504, D3 0.475) -- **past
-> GPT-5.1's 0.4856 and well past the paper's best open-weight, 0.460, using an 8B model.** Nothing is
-> built and unsubmitted. **D3 is 80% of the remaining gap to GPT-5.1**; the next two levers are both
-> free and pre-sized in "The three slots after this": the 756 excluded `last-number` rows, and
-> log-space fusion of the two arms on the 1,246 rows both answered (`quantiphy.fusion` is referenced
-> in `backends/vlm.py`, is now BUILT). **`mix-v11` (the last-number rows) and `mix-v12` (fusion at
-> cap 5) are built, validated and unsubmitted -- submit `mix-v11` first.** Read the fusion section
-> before believing `mix-v12`: the plain geometric mean *loses* to taking the VLM alone, and the
-> capped variant's significance comes from a sweep over the same 60 rows that chose the cap.
+> **`mix-v14`, macro 0.498** on the board (S2 0.475, D2 0.540, S3 0.506, D3 0.471) -- **past
+> GPT-5.1's 0.4856 and well past the paper's best open-weight, 0.460, using an 8B model.**
 >
-> **The VLM arm is now the top item, and everything geometric is worth thousandths.** Solver on
-> S2/S3 plus a Qwen-class VLM on D2/D3 composes to **~0.492** by arithmetic, and at 0.4435 we are
-> still below the paper's best open-weight number (0.460), which is what Track B has to beat. A
-> prompt A/B (`brief` vs `direct` — the CoT question) ran on the 159 truth-bearing validation rows on
-> 2026-08-27; read it with `py -3.12 scripts/score_vlm.py --run validation-vlm-qwen3vl8b-brief
-> --run validation-vlm-qwen3vl8b-direct` before committing to a full test pass.
+> **SUBMIT `mix-v15` FIRST, before anything else.** It is built, validated and unsubmitted, and it
+> is free arithmetic rather than a hypothesis: `mix-v14` with D3 reverted to `mix-v10`'s value,
+> because the D3 channel of `mix-v14` was a probe that lost. Predicted **0.499** (S2 0.475, D2 0.540,
+> S3 0.506, D3 0.475). Per-category composition has now been exact **five** times; if this one is not
+> 0.499 then something in the pipeline changed and nothing else that day should be believed.
 >
-> Read "2026-08-27" then "2026-08-26" before proposing a lever. **Six single-cause theories of the 3D
-> bias have been refuted and the seventh was real:** the radial correction was applied to the target
-> and never to the prior, which could only ever fire in D3. **Constant-multiplier probing is
-> exhausted** (8 group probes, 8 losses). **"D3 is closed to the solver" holds for thresholds on
-> disagreement magnitude but not for selection by route** — see `scripts/method_ids.py`. Item 1k (the
-> gravity prior) is re-sized and **not free**: its 46 videos are all detection-cache misses. Ask me
-> before spending more than ~$20 in a session.
+> Read "2026-08-29" first — it spent three slots and closed two questions. **Fusing the solver into
+> the VLM is now a settled, per-category question, not an open one:** it WINS in S2 (+0.071/row, and
+> weight 0.7 beats 0.5 by a further +0.009/row), is NULL in S3 (+0.006/row), and LOSES in D2
+> (-0.022/row) and D3 (-0.045/row for the geometric mean, -0.047/row for prefer-lower). **D3 has now
+> rejected both blends, so stop offering the solver to D3 sentinel rows.** The `last-number` parse
+> route is REFUTED outright, 4 categories for 4 (`mix-v11`, -0.106 to -0.253/row) -- keep excluding
+> those 756 rows and never overlay them again.
+>
+> **The open S2 question is the one with momentum**, and it is free: weight 0.5 -> 0.7 gained
+> +0.009/row on 204 rows, so weight 1.0 (the solver alone on exactly those rows) is the obvious next
+> probe and needs no new compute. **D3 remains 80% of the gap to GPT-5.1** (-0.112) and is now only
+> reachable by a better VLM, not by the solver -- item C, Qwen3-VL-32B in 4-bit, ~$25-40, needs
+> sign-off.
+>
+> **`replay-tangential.csv` is GONE** (`replay-*.csv` is gitignored) and you do not need it: at
+> `weight == 0.5` the fused value is invertible, so `solver = fused ** 2 / vlm` recovers the solver
+> arm exactly on every `fuse-fused` row. `replay-reconstructed.csv` is rebuilt that way and the
+> property is pinned by `test_the_unweighted_mean_recovers_either_arm_from_the_other`. It only covers
+> fused rows -- the 120 D3 rows capped out by disagreement are NOT recoverable, so any probe that
+> needs those must re-run `replay_cache.py` against the Hub's detection cache first.
+>
+> **Everything geometric is now worth thousandths; the VLM arm is the top item.** Read "2026-08-27"
+> then "2026-08-26" before proposing a lever. **Six single-cause theories of the 3D bias have been
+> refuted and the seventh was real:** the radial correction was applied to the target and never to
+> the prior, which could only ever fire in D3. **Constant-multiplier probing is exhausted** (8 group
+> probes, 8 losses). Item 1k (the gravity prior) is re-sized and **not free**: its 46 videos are all
+> detection-cache misses. Ask me before spending more than ~$20 in a session.
+
+## 2026-08-29 — three slots, one refutation, one win, and the champion at 0.498
+
+Slots spent: `mix-v11`, `mix-v13`, `mix-v14`. Board went 0.491 -> 0.498. Every reading below is a
+per-category delta against a base the portal had already measured, so each is independent.
+
+### `mix-v11` — the 756 `last-number` rows are REFUTED, 4 categories for 4
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| `mix-v10` | 0.447 | 0.540 | 0.504 | 0.475 | 0.491 |
+| `mix-v11` | 0.422 | 0.519 | 0.433 | 0.440 | **0.454** |
+| leverage | 0.136 | 0.198 | 0.281 | 0.292 | |
+| **per row** | **-0.184** | **-0.106** | **-0.253** | **-0.120** | |
+
+Validation had priced these at -0.156/row against a *constant* and the CI excluded zero. Against the
+champion they are worse still, in every category, with no sign ambiguity anywhere. **The decision to
+overlay only the VLM's 1,619 sentinel rows was correct and stays.** The parse route is the quality
+signal, exactly as "2026-08-28" claimed; this is the confirmation on test.
+
+**This result also invalidated `mix-v12` before it was ever sent.** 377 of its 1,288 changed rows
+(29%) took their VLM arm from the `last-number` route -- 17% of its S2 channel, 30% of D2 and S3, 38%
+of D3. Sending it would have confounded an open hypothesis with a measured-bad input and produced a
+number nobody could attribute. **`mix-v12` is dead; do not submit it.** `mix-v13` is its clean
+replacement: the same fusion at cap 5, with `data/probes/ids-fused-sentinel.csv` (929 rows) in place
+of `ids-fused.csv` (1,307).
+
+### `mix-v13` — fusion is a per-category question, and the answer differs by category
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| `mix-v10` | 0.447 | **0.540** | 0.504 | **0.475** | 0.491 |
+| `mix-v13` | **0.472** | 0.534 | **0.506** | 0.466 | **0.494** |
+| leverage | 0.351 | 0.278 | 0.358 | 0.202 | |
+| **per row** | **+0.071** | -0.022 | +0.006 | -0.045 | |
+
+**S2 is a large, unambiguous win and it is the first time blending the two arms has paid anywhere.**
+S3 is a null. D2 and D3 both lose. The validation-set finding that "the plain geometric mean loses to
+taking the VLM alone" was right *on average* and wrong *per category* -- averaging across categories
+hid a +0.071 and a -0.045 that cancel.
+
+**Caveat on S2, carried over from `mix-v12` and still unresolved.** The solver arm behind the fused
+S2 values is `replay-tangential.csv` at band `(30, inf)`, while `mix-v10`'s S2 came from `solver-v4`
+at the S2 floor of 0. So some part of the +0.071/row may be the different solver input rather than
+fusion. It is a measured win on the board either way, but do not attribute all of it to fusion.
+
+### `mix-v14` — two locks, two experiments, and the fifth exact composition
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| base | 0.472 (`v13`) | 0.540 (`v10`) | 0.506 (`v13`) | 0.475 (`v10`) | |
+| `mix-v14` | **0.475** | **0.540** | **0.506** | 0.471 | **0.498** |
+| | weight 0.7 | LOCK | LOCK | prefer-lower | |
+
+**D2 returned 0.540 and S3 returned 0.506 to the digit.** That is the fifth exact per-category
+composition and it is still the most reliable instrument on this project.
+
+* **S2, fusion weight 0.5 -> 0.7 (more solver): +0.003 on 199 of 581 rows = +0.009/row.** Small but
+  the right sign, and it points somewhere: if more solver is better twice, try the solver alone.
+* **D3, prefer-lower: -0.004 on 83 of 972 rows = -0.047/row.** `prefer_lower` was the one fusion
+  variant with a *mechanism* rather than a fitted parameter -- fatal overshoots run 20% solver, 15%
+  VLM, 5% for the minimum -- and on D3 it loses by the same margin the geometric mean did.
+
+**D3 is closed to the solver again, and this time by two independent estimators.** The geometric mean
+(-0.045/row) and the minimum (-0.047/row) agree. The 2026-08-27 finding that the tangential fix
+reopened D3 still stands -- that was the solver *against a constant*, on rows the VLM never answered.
+Against the VLM's own answer on sentinel rows, the solver adds nothing to D3.
+
+### The solver arm was recovered by inverting the fusion, not by re-running the replay
+
+`replay-tangential.csv` was gone -- `replay-*.csv` is gitignored and it is a run output. Every
+`fuse-fused` row is the *unweighted* geometric mean of two arms, so `solver = fused ** 2 / vlm`
+recovers it exactly, and the VLM arm was still on disk. Rebuilt as `replay-reconstructed.csv`, 1,307
+rows.
+
+**The check that made it trustworthy:** the recovered S2/D2/S3 values matched the surviving
+pre-tangential-fix replay (`replay-band30inf.csv`) on **997 of 997** comparable rows, and D3 matched
+on 191 of 310 -- differing on exactly the rows the tangential fix touches. That is two independent
+confirmations in one query: the algebra is right, and the fix really is category-isolated to D3.
+
+**Its limit matters.** Only fused rows are recoverable. The 120 D3 and 59 S2 sentinel rows that were
+capped out by disagreement have no solver value on disk, so any probe that needs them must re-run
+`replay_cache.py` against the Hub's detection cache first.
+
+### What to build next, in order
+
+1. **`mix-v15`, already built** -- free arithmetic, predicted 0.499. Send it first.
+2. **S2 at weight 1.0** -- the solver alone on the 204 clean fused S2 rows. Free, needs no replay
+   (`replay-reconstructed.csv` covers every fused row), and the weight trend 0.5 -> 0.7 predicts it.
+   Bracket it in one slot: S2 weight 1.0, and hold D2/S3/D3 as locks, or spend S3 on weight 0.3
+   (more solver, since S3's primary *is* the solver) to test the same "more solver" direction twice.
+3. **Qwen3-VL-32B in 4-bit, ~$25-40, needs sign-off.** D3 is -0.112 from GPT-5.1 and is now
+   demonstrably not reachable from the solver side. The paper puts the 32B at D3 0.534 standalone
+   against our 0.475. `VLM_4BIT=1`, `a100-large` and `VLM_MAX_SIDE` are already wired.
+
+**Deprioritised further: anything that offers the solver to D2 or D3 sentinel rows.** Three probes
+now (`mix-v13` D2, `mix-v13` D3, `mix-v14` D3) and three losses.
 
 ## 2026-08-27/28 — champion 0.441 -> 0.491, past GPT-5.1, with an 8B open-weight model
 

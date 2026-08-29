@@ -47,6 +47,27 @@ def test_the_mean_is_scale_equivariant() -> None:
         assert fusion.log_mean(3.0 * k, 7.0 * k) == pytest.approx(base * k, rel=1e-12)
 
 
+def test_the_unweighted_mean_recovers_either_arm_from_the_other() -> None:
+    """At the default weight the fused value is invertible: ``second == fused ** 2 / first``.
+
+    This is not a curiosity. ``replay-tangential.csv`` is a gitignored run output and was gone by
+    2026-08-29, so the solver arm behind ``fuse-v1.predictions.csv`` could not be re-read -- but every
+    ``fuse-fused`` row is the geometric mean of two arms and one of them (the VLM's) was still on
+    disk. Inverting recovered the solver's 1,307 answers exactly, which is how the S2 and D3 probes
+    of that day were built without a fresh replay. The check that proved it: the recovered S2/D2/S3
+    values matched the surviving pre-tangential-fix replay on 997 of 997 rows, and D3 differed on
+    exactly the rows that fix touches.
+
+    It holds only at ``weight == 0.5``. A weighted mean is still invertible but by a different
+    exponent, so anything relying on this must not silently inherit a changed default.
+    """
+    assert fusion.WEIGHT == 0.5
+    for first, second in ((3.0, 7.0), (0.004, 12000.0), (1.0, 1.0)):
+        fused = fusion.log_mean(first, second)
+        assert fused ** 2 / first == pytest.approx(second, rel=1e-9)
+        assert fused ** 2 / second == pytest.approx(first, rel=1e-9)
+
+
 @pytest.mark.parametrize("weight, expected", [(0.0, 3.0), (1.0, 12.0), (0.5, 6.0)])
 def test_weight_interpolates_between_the_two_arms(weight: float, expected: float) -> None:
     assert fusion.log_mean(3.0, 12.0, weight) == pytest.approx(expected)
