@@ -155,3 +155,69 @@ class TestGates:
         usable = frame["value"].notna() & frame["route"].str.startswith("sentinel")
         assert int(usable.sum()) == 0
         assert PUBLISHED["vlm-sentinel"] == 1619
+
+
+class TestSplitMismatchGuard:
+    """The footgun tomorrow's prompt A/B would have walked into.
+
+    A validation run has `row_index` 0..158 and so do the first 159 rows of the test predictions, so
+    joining one against the other succeeds, validates one-to-one, and labels every row with an
+    unrelated category. The A/B would then have been read off noise.
+    """
+
+    @staticmethod
+    def _replies(n: int) -> pd.DataFrame:
+        return pd.DataFrame({
+            "row_index": range(n),
+            "raw_text": [f"ANSWER: {i + 1}" for i in range(n)],
+            "unit": ["meters"] * n,
+        })
+
+    @staticmethod
+    def _predictions(tmp_path, n: int, with_row_index: bool = True):
+        frame = pd.DataFrame({
+            "video_type": ["S2MC"] * n,
+            "inference_type": ["SS"] * n,
+        })
+        if with_row_index:
+            frame["row_index"] = range(n)
+        path = tmp_path / "predictions.csv"
+        frame.to_csv(path, index=False)
+        return path
+
+    def test_a_row_count_mismatch_is_refused(self, tmp_path) -> None:
+        from audit_vlm_raw import reparse
+
+        with pytest.raises(SystemExit, match="mislabels every category"):
+            reparse(self._replies(159), self._predictions(tmp_path, 3289))
+
+    def test_partial_allows_a_deliberate_smoke_run(self, tmp_path) -> None:
+        from audit_vlm_raw import reparse
+
+        out = reparse(self._replies(20), self._predictions(tmp_path, 3289), partial=True)
+        assert len(out) == 20
+        assert out["video_type"].notna().all()
+
+    def test_a_run_reaching_past_the_predictions_file_is_refused(self, tmp_path) -> None:
+        from audit_vlm_raw import reparse
+
+        replies = self._replies(10)
+        replies["row_index"] = range(3280, 3290)
+        with pytest.raises(SystemExit, match="wrong --predictions"):
+            reparse(replies, self._predictions(tmp_path, 3289), partial=True)
+
+    def test_a_fixture_without_row_index_gets_one_from_split_order(self, tmp_path) -> None:
+        """The validation fixture carries no row_index. Same convention as make_submission.py."""
+        from audit_vlm_raw import reparse
+
+        out = reparse(self._replies(159), self._predictions(tmp_path, 159, with_row_index=False))
+        assert len(out) == 159
+        assert out["video_type"].notna().all()
+
+    def test_missing_category_columns_are_refused(self, tmp_path) -> None:
+        from audit_vlm_raw import reparse
+
+        path = tmp_path / "bad.csv"
+        pd.DataFrame({"row_index": range(5), "parsed_value": [1.0] * 5}).to_csv(path, index=False)
+        with pytest.raises(SystemExit, match="cannot label categories"):
+            reparse(self._replies(5), path)

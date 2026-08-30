@@ -38,7 +38,8 @@ its own ``SOLVER_V1`` gate, and it is the only reason to believe anything below 
 Usage:
     py -3.12 scripts/audit_vlm_raw.py
     py -3.12 scripts/audit_vlm_raw.py --run test-vlm-qwen3vl8b-brief --shards 4
-    py -3.12 scripts/audit_vlm_raw.py --run validation-vlm-qwen3vl8b-brief --shards 0
+    py -3.12 scripts/audit_vlm_raw.py --run validation-vlm-qwen3vl8b-brief --shards 0 \
+        --predictions data/fixtures/quantiphy_validation.csv --no-count-gate
 """
 
 from __future__ import annotations
@@ -125,13 +126,19 @@ def load_raw(repo: str, run: str, shards: int) -> pd.DataFrame:
     return frame.sort_values("row_index").reset_index(drop=True)
 
 
-def reparse(frame: pd.DataFrame, predictions: Path) -> pd.DataFrame:
+def reparse(frame: pd.DataFrame, predictions: Path, partial: bool = False) -> pd.DataFrame:
     """Re-run the shipped parser over the raw text, and carry in the columns the audit needs.
 
     ``category_labels`` needs ``video_type``/``inference_type``, which the JSONL does not store, so
-    they are joined from the published predictions CSV on ``row_index``. ``unit`` *is* in the JSONL and
-    is used from there -- it is what the run itself passed to the parser, so re-parsing with it is a
-    true replay rather than an approximation.
+    they are joined from ``predictions`` on ``row_index``. ``unit`` *is* in the JSONL and is used from
+    there -- it is what the run itself passed to the parser, so re-parsing with it is a true replay
+    rather than an approximation.
+
+    **Pass the right ``--predictions`` for the split.** A validation run's ``row_index`` runs 0..158
+    and so does the test file's first 159 rows, so joining a validation run against the test
+    predictions silently succeeds and labels every row with an unrelated category. The length check
+    below is what makes that loud instead: it is the difference between reading a prompt A/B and
+    reading noise.
     """
     out = frame.copy()
     out["raw_text"] = out["raw_text"].fillna("").astype(str)
@@ -141,8 +148,34 @@ def reparse(frame: pd.DataFrame, predictions: Path) -> pd.DataFrame:
     out["value"] = [p.value for p in parsed]
     out["reason"] = [p.note for p in parsed]
 
-    published = pd.read_csv(predictions, usecols=["row_index", "video_type", "inference_type"])
-    return out.merge(published, on="row_index", how="left", validate="one_to_one")
+    published = pd.read_csv(predictions)
+    missing = {"video_type", "inference_type"} - set(published.columns)
+    if missing:
+        raise SystemExit(f"{predictions} has no {sorted(missing)}; it cannot label categories")
+    if "row_index" not in published.columns:
+        # The validation fixture is 159 rows in split order and carries no row_index, which is the
+        # same convention `make_submission.py` relies on: id == row_index + 1.
+        published = published.assign(row_index=range(len(published)))
+    published = published[["row_index", "video_type", "inference_type"]]
+
+    highest = int(out["row_index"].max())
+    if highest >= len(published):
+        raise SystemExit(f"the run reaches row_index {highest} but {predictions} has only "
+                         f"{len(published)} rows -- wrong --predictions for this split")
+    if len(out) != len(published) and not partial:
+        raise SystemExit(
+            f"{len(out)} replies against {len(published)} rows in {predictions}.\n"
+            f"  A 159-row validation run joined against the 3,289-row test predictions succeeds\n"
+            f"  silently and mislabels every category, because both start at row_index 0. Pass\n"
+            f"  --predictions data/fixtures/quantiphy_validation.csv for a validation run, or\n"
+            f"  --partial if this really is an incomplete run of that split.")
+
+    merged = out.merge(published, on="row_index", how="left", validate="one_to_one")
+    unlabelled = int(merged["video_type"].isna().sum())
+    if unlabelled:
+        raise SystemExit(f"{unlabelled} replies got no category from {predictions} -- wrong file "
+                         f"for this run, or the run reaches rows the file does not describe")
+    return merged
 
 
 def gate_replay(frame: pd.DataFrame) -> None:
@@ -312,7 +345,7 @@ def report(frame: pd.DataFrame) -> None:
 
     fixable = hole["cause"].str.startswith(("1.", "2. ZERO: refusal", "2. ZERO: reasoning"))
     print(f"\n  addressable by a prompt/config change (truncation + refusal + sig-figs): "
-          f"{int(fixable.sum())} rows ({fixable.sum()/len(frame):.1%} of the test set)")
+          f"{int(fixable.sum())} rows ({fixable.sum()/len(frame):.1%} of this split)")
     print("  by category:", hole.loc[fixable, "category"].value_counts().reindex(
         list(CATEGORIES)).to_dict())
     print("\n  Genuine 'the object is stationary' claims are NOT in that count: they are a physics")
@@ -325,14 +358,27 @@ def main() -> int:
     parser.add_argument("--repo", default=DEFAULT_REPO)
     parser.add_argument("--run", default=DEFAULT_RUN)
     parser.add_argument("--shards", type=int, default=4, help="0 for an unsharded run")
-    parser.add_argument("--predictions", type=Path, default=ROOT / "vlm-v1.predictions.csv",
-                        help="published predictions CSV, for the category columns")
+    parser.add_argument("--predictions", type=Path, default=None,
+                        help="CSV carrying video_type/inference_type for the category labels; "
+                             "defaults by run name (validation-* -> the validation fixture)")
+    parser.add_argument("--partial", action="store_true",
+                        help="allow fewer replies than the predictions file has rows, for a LIMIT "
+                             "smoke run; without it a row-count mismatch is refused")
     parser.add_argument("--no-count-gate", action="store_true",
                         help="skip the published-count gate; the row-by-row replay gate still runs")
     args = parser.parse_args()
 
+    predictions = args.predictions
+    if predictions is None:
+        # The run name convention is `{split}-vlm-...`, set by run_vlm_job.py's own default
+        # RUN_NAME, so it is a reliable enough default -- and getting it wrong is now refused
+        # rather than silently mislabelled.
+        predictions = (ROOT / "data" / "fixtures" / "quantiphy_validation.csv"
+                       if args.run.startswith("validation") else ROOT / "vlm-v1.predictions.csv")
+        print(f"  categories from {predictions.name} (inferred from the run name)")
+
     print(f"downloading raw replies from {args.repo} :: {args.run}")
-    frame = reparse(load_raw(args.repo, args.run, args.shards), args.predictions)
+    frame = reparse(load_raw(args.repo, args.run, args.shards), predictions, args.partial)
     print(f"\n{len(frame)} replies re-parsed")
     gate_replay(frame)
     if not args.no_count_gate:

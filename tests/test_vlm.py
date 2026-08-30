@@ -125,3 +125,40 @@ def test_downscale_is_disabled_by_a_non_positive_cap() -> None:
     from PIL import Image
     original = Image.new("RGB", (1920, 1080))
     assert downscale(original, max_side=0) is original
+
+
+# ---------------------------- 2026-08-30: the generation budget that truncated 841 replies
+
+def test_the_generation_budget_is_no_longer_the_128_that_truncated_a_quarter_of_the_run() -> None:
+    """Measured, not guessed: 841 of 3,289 test replies never reached the `ANSWER:` marker.
+
+    A marker-less reply ends where a finished sentence would only 16.9% of the time, against 99.5%
+    when the marker survived, and the samples end mid-number. `scripts/audit_vlm_raw.py` reports
+    this directly, so a regression here is detectable without a GPU.
+    """
+    from quantiphy.backends.vlm import DEFAULT_MAX_NEW_TOKENS, VlmBackend
+
+    assert DEFAULT_MAX_NEW_TOKENS > 128, "128 is the value that cut 841 replies short"
+    assert VlmBackend("Qwen/Qwen3-VL-8B-Instruct").max_new_tokens == DEFAULT_MAX_NEW_TOKENS
+
+
+def test_the_budget_stays_bounded() -> None:
+    """Generation halts at EOS, so a higher cap costs decode time only on rows that were truncated.
+
+    An unbounded cap would still be wrong: one degenerate reply could eat a shard's time budget, and
+    a shard is 1.5-2.5 h of paid GPU.
+    """
+    from quantiphy.backends.vlm import DEFAULT_MAX_NEW_TOKENS
+
+    assert DEFAULT_MAX_NEW_TOKENS <= 1024
+
+
+def test_the_budget_is_overridable_so_it_never_needs_a_code_change_again() -> None:
+    """The defect was not the number, it was that the number was unreachable from the environment.
+
+    Every other run parameter -- frames, frame side, 4-bit, model, prompt -- was already env-driven,
+    so this one was the only knob a re-run could not turn.
+    """
+    from quantiphy.backends.vlm import VlmBackend
+
+    assert VlmBackend("m", max_new_tokens=96).max_new_tokens == 96

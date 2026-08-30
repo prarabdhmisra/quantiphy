@@ -160,3 +160,91 @@ def test_an_unknown_style_is_refused_rather_than_silently_defaulted() -> None:
         build_prompt(request, "length of boat = 3.62m", None, style="chain-of-thought")
     with pytest.raises(ValueError):
         system_prompt("verbose")
+
+
+# ------------------------------- 2026-08-30: the `strict` style, from measured defects
+
+def test_strict_forbids_declining_because_457_replies_declined() -> None:
+    """The single biggest addressable defect found in the 8B's 3,289 test replies.
+
+    457 of them said the quantity "cannot be determined without a reference" while the prompt was
+    supplying one, concentrated in D2 (218) and D3 (171) -- the two categories the VLM otherwise
+    wins. So `strict` has to close that door in the system turn, where the reference is introduced.
+    """
+    system = system_prompt("strict").lower()
+    assert "always give a number" in system
+    assert "never reply that the quantity cannot be determined" in system
+    assert "never answer zero" in system
+
+
+def test_strict_asks_for_two_significant_figures_because_118_rounded_to_zero() -> None:
+    """118 replies computed a real value and answered 0 -- a sub-metre magnitude rounded to an int.
+
+    Under MRA a zero is not a small answer, it is a hard zero, scoring the same as a 100x overshoot.
+    """
+    prompt = build_prompt(build_request(row("What is the width of the pier in meters?")),
+                          "length of boat = 3.62m", None, style="strict")
+    assert "two significant figures" in prompt
+    assert "never 0" in prompt
+    assert ANSWER_SENTINEL in prompt
+
+
+def test_strict_is_not_the_downward_nudge_the_module_refuses() -> None:
+    """Forbidding a zero constrains the format; it must not bias the estimate.
+
+    `prompting`'s own docstring rules out asking the model to answer low, because shrinking a good
+    per-row predictor was measured on GPT-5.1's 159 validation answers and loses monotonically at
+    every factor from 0.95 down. A format rule is allowed; a direction is not.
+    """
+    text = (build_prompt(build_request(row("What is the width of the pier in meters?")),
+                         "length of boat = 3.62m", None, style="strict")
+            + " " + system_prompt("strict")).lower()
+    for nudge in ("underestimate", "err low", "smaller", "conservative", "round down"):
+        assert nudge not in text
+
+
+def test_brief_is_byte_identical_to_the_measured_baseline() -> None:
+    """`strict` is a third style rather than an edit to `brief`, and this is what pins that.
+
+    Every reading on the board came from `brief`. If adding a challenger silently moved the
+    incumbent, the A/B would compare two unmeasured prompts and the eight recorded `prompt_sha`
+    values would no longer identify what produced them.
+    """
+    request = build_request(row("What is the speed of the car at 1.0s in m/s?"))
+    assert system_prompt("brief") == (
+        "You are a careful physical measurement assistant. You are given frames from a video, a "
+        "real-world reference measurement taken from that same scene, and a question. Use the "
+        "reference measurement to set the scale -- do not answer from typical real-world sizes, "
+        "because the scene may be scaled differently from what you expect. Reason briefly, then "
+        "give a single number.")
+    assert build_prompt(request, "length of boat = 3.62m", "distance_car_camera = 9m") == (
+        "Reference measurement from this scene: length of boat = 3.62m\n"
+        "Camera distances in this scene: distance_car_camera = 9m\n"
+        "The question asks about the instant t = 1 s.\n"
+        "\n"
+        "Question: What is the speed of the car at 1.0s in m/s?\n"
+        "\n"
+        "Answer with a single number in m/s. Do not convert to any other unit. Keep any reasoning "
+        "to one or two sentences, then end with exactly:\n"
+        f"{ANSWER_SENTINEL} <number>")
+
+
+def test_strict_keeps_the_prior_the_unit_and_the_instant() -> None:
+    """The three things the benchmark turns on must survive the new style too."""
+    request = build_request(row("What is the speed of the car at 1.0s in m/s?"))
+    prompt = build_prompt(request, "length of boat = 3.62m", "distance_car_camera = 9m",
+                          style="strict")
+    assert "3.62m" in prompt and "m/s" in prompt
+    assert "t = 1 s" in prompt and "Camera distances" in prompt
+
+
+def test_strict_still_asks_for_less_reasoning_than_brief() -> None:
+    """Tighter than `brief`'s "one or two sentences", which helps the truncation fix.
+
+    It does not substitute for it: the cap is what actually cut 841 replies off, and a shorter
+    instruction only reduces how often a reply reaches the cap.
+    """
+    request = build_request(row("What is the width of the pier in meters?"))
+    strict = build_prompt(request, "length of boat = 3.62m", None, style="strict")
+    assert "one short sentence" in strict
+    assert "one or two sentences" not in strict

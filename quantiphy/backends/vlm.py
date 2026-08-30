@@ -46,6 +46,32 @@ INSTANT_WINDOW_S = 1.0
 #: do not raise it to "use the GPU we paid for".
 MAX_FRAME_SIDE = 768
 
+#: Generation budget per reply. **This was 128 and it was silently costing a quarter of the metric.**
+#:
+#: Measured 2026-08-30 by re-parsing the 3,289 persisted replies of the 8B test run
+#: (``scripts/audit_vlm_raw.py``): **841 rows had no ``ANSWER:`` marker at all**, and the cause is
+#: this constant rather than the model. The discriminator is *where* the reply stops, not how long it
+#: is -- a marker-less reply ends where a finished sentence would only **16.9%** of the time, against
+#: **99.5%** when the marker survived, and the samples end mid-number ("the distance is approximately
+#: 1."). The ``brief`` style asks for one or two sentences of reasoning *before* the sentinel, so the
+#: cap was cutting the answer off after the reasoning had eaten the budget.
+#:
+#: **It also explains the ``last-number`` refutation.** That fallback scrapes the final number in the
+#: reply, which on a truncated reply is a fragment -- 1 where the sentence was going to say 1.85. Under
+#: MRA that is most of a hard zero, which is why those 756 rows measured -0.106 to -0.253/row in all
+#: four categories (``mix-v11``) rather than merely noisy. The route was never the defect.
+#:
+#: 320 is ~2.5x the old cap and comfortably past the p99 of replies that *did* finish (576 chars,
+#: ~105 tokens at this run's ~5.5 chars/token). It stays bounded on purpose: generation halts at EOS,
+#: so a higher cap costs decode time only on the rows that were being truncated, but an unbounded cap
+#: would let one degenerate reply eat a shard's budget. Raise it if a measurement says replies are
+#: still being cut; the audit reports that directly.
+#:
+#: Note the char-per-token figure is inferred, not tokenized. Do not re-derive a cap from it -- the
+#: first truncation test tried to find this bug in the character histogram and failed, because a cap
+#: counted in tokens spreads out in character space.
+DEFAULT_MAX_NEW_TOKENS = 320
+
 
 def downscale(frame, max_side: int = MAX_FRAME_SIDE):
     """Shrink a PIL frame so its long side is at most ``max_side``, preserving aspect ratio.
@@ -106,7 +132,7 @@ class VlmBackend:
     """A vision-language model answering one question at a time."""
 
     def __init__(self, model_id: str, frames: int = DEFAULT_FRAMES,
-                 max_new_tokens: int = 128, load_in_4bit: bool = False,
+                 max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS, load_in_4bit: bool = False,
                  max_frame_side: int = MAX_FRAME_SIDE) -> None:
         self.model_id = model_id
         self.frames = frames

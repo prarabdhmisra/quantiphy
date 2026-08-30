@@ -8,9 +8,9 @@ Last worked: **2026-08-30**.
 > on the board before spending anything on GPU.
 
 > **Where things live.** This document is on both branches and is accurate on both. The *code* from
-> 2026-08-05 onward is only on **`fix/prior-grounding-phrase`** (pushed, 309 tests green) —
+> 2026-08-05 onward is only on **`fix/prior-grounding-phrase`** (pushed, 323 tests green) —
 > `main` is deliberately still at the last *measured* state, 94 tests. Anything below that names
-> `scripts/replay_cache.py`, `scripts/audit_vlm_raw.py` or 309 tests needs that branch checked out:
+> `scripts/replay_cache.py`, `scripts/audit_vlm_raw.py` or 323 tests needs that branch checked out:
 >
 > ```bash
 > git checkout fix/prior-grounding-phrase
@@ -56,18 +56,150 @@ Last worked: **2026-08-30**.
 > Not a selection effect: the solver answers 80.2% of the VLM's failure rows against 78.6% overall,
 > so the dropped rows are ordinary.
 >
-> **Next, in order:** (1) raise `max_new_tokens` and make it an env var; (2) rewrite the prompt for
-> the refusals and sig-figs; (3) one 8B re-run, ~$8-12, iterated on the 159-row validation split and
-> judged on **coverage, not MRA** — coverage is a count, that split's MRA has a ±5.7 pt CI and has
-> misled this project three times. Pre-commit the bar: sentinel ≥ 70%, zero ≤ 10%. `RUN_NAME` must
-> change with the prompt or resume replays stale replies; keep `VLM_MAX_SIDE=768` (all four shards
-> once OOMed on a 22 GB L4). Then (4) re-optimise fusion on the new arm, one slot. **(5) Qwen3-VL-32B
-> in 4-bit only after that, and re-price it** — the `$25-40` figure here has no recorded basis, and
-> the 8B already scores validation D3 0.5234 against the paper's 32B 0.534.
+> **Steps 1 and 2 are DONE and committed** — `DEFAULT_MAX_NEW_TOKENS = 320` with a
+> `VLM_MAX_NEW_TOKENS` override, and a new `strict` prompt style (`brief` left byte-identical and
+> pinned by a test). **Read "RESUME HERE 2026-08-31" for the two commands to run first**: two 159-row
+> validation runs, ~20 min and cents each, that separate the token fix from the prompt fix instead of
+> confounding them. The bar is pre-committed there — do not look at the numbers before reading it.
+> Judge on **coverage, not MRA**: coverage is a count and this split resolves it (47.2% sentinel here
+> against test's 49.2%), while its MRA carries a ±5.7 pt CI and has misled this project three times.
+> `QUANTIPHY_GIT` must carry `@fix/prior-grounding-phrase` or the job installs the old 128-token code.
+> Then (3) the 4-shard test run ~$8-12 only if the bar is met, (4) re-optimise fusion on the new arm,
+> one slot — **every `data/probes/ids-*sentinel*.csv` is keyed to the old run and will be wrong**.
+> **(5) Qwen3-VL-32B in 4-bit only after that, and re-price it** — the `$25-40` figure here has no
+> recorded basis, and the 8B already scores validation D3 0.5234 against the paper's 32B 0.534.
 >
 > `replay-full.csv` is the full solver arm (2,585/3,289 solved) and `replay_cache.py` regenerates it
 > free in ~2 s, so never work around a missing replay. Ask me before spending more than ~$20 in a
 > session.
+
+## RESUME HERE 2026-08-31 — steps 1 and 2 are DONE; tomorrow is two cheap validation runs
+
+Both fixes are committed and tested. **Nothing has been run on a GPU yet, and no submission slot is
+owed.** Tomorrow's first action is two 159-row validation runs, ~20 minutes and cents each.
+
+### What changed in the code (done, 323 tests green)
+
+| change | file | what |
+|---|---|---|
+| **the token cap** | `quantiphy/backends/vlm.py` | `DEFAULT_MAX_NEW_TOKENS = 320`, up from a hardcoded 128, with the full measurement in its docstring |
+| **env override** | `scripts/run_vlm_job.py` | `VLM_MAX_NEW_TOKENS`, and the value is now echoed in the run's own log line |
+| **the prompt** | `quantiphy/prompting.py` | a **third** style, `strict` -- `brief` is byte-identical and pinned by a test |
+| **audit split guard** | `scripts/audit_vlm_raw.py` | a validation run joined against the test predictions is now refused, not silently mislabelled |
+
+`strict`, in full:
+
+* system adds -- *"Reason in one short sentence, then give a single number. Always give a number: the
+  reference measurement you are given is the reference you need, so never reply that the quantity
+  cannot be determined, and never answer zero. If you are unsure, estimate."*
+* user turn adds -- *"Give at least two significant figures, and never 0. Keep reasoning to one short
+  sentence, then end with exactly:"*
+
+**Why a third style and not an edit to `brief`.** Every reading on the board came from `brief`, and
+every recorded `prompt_sha` is a `brief` prompt. Moving the incumbent would make the A/B a comparison
+of two unmeasured prompts. `tests/test_prompting.py` pins `brief` byte-for-byte for exactly that
+reason.
+
+**Why this is not the downward nudge `prompting.py` refuses.** Forbidding a zero and asking for two
+significant figures constrains the *format*, not the direction. A zero is not a small answer under
+MRA -- it is a hard zero, scoring identically to a 100x overshoot.
+
+### Run these two, in this order. They are cheap and they separate the two fixes.
+
+The fixes are confounded if run together, and this project has been burned by that repeatedly. Two
+runs isolate them, and the `brief` @ 128 baseline is **already on the Hub** so it costs nothing.
+
+```bash
+# A -- the token fix alone. brief prompt, raised cap. Isolates truncation.
+hf jobs uv run --detach --flavor l4x1 --timeout 2h --secrets HF_TOKEN \
+  --env QUANTIPHY_GIT=git+https://github.com/prarabdhmisra/quantiphy.git@fix/prior-grounding-phrase \
+  --env OUTPUT_REPO=prarabdhmisra/quantiphy-runs \
+  --env SPLIT=validation --env VLM_MODEL=Qwen/Qwen3-VL-8B-Instruct \
+  --env VLM_PROMPT=brief --env VLM_MAX_NEW_TOKENS=320 \
+  --env RUN_NAME=validation-vlm-8b-brief-t320 \
+  scripts/run_vlm_job.py
+
+# B -- token fix + prompt fix. Isolates what `strict` adds on top of A.
+hf jobs uv run --detach --flavor l4x1 --timeout 2h --secrets HF_TOKEN \
+  --env QUANTIPHY_GIT=git+https://github.com/prarabdhmisra/quantiphy.git@fix/prior-grounding-phrase \
+  --env OUTPUT_REPO=prarabdhmisra/quantiphy-runs \
+  --env SPLIT=validation --env VLM_MODEL=Qwen/Qwen3-VL-8B-Instruct \
+  --env VLM_PROMPT=strict --env VLM_MAX_NEW_TOKENS=320 \
+  --env RUN_NAME=validation-vlm-8b-strict-t320 \
+  scripts/run_vlm_job.py
+```
+
+**`QUANTIPHY_GIT` must carry `@fix/prior-grounding-phrase`.** The fixes are on that branch; `main` is
+still at the last measured code state, so a run without the ref would silently install the old 128-token
+code and reproduce the bug.
+
+Then read each one -- free, no GPU:
+
+```bash
+py -3.12 scripts/audit_vlm_raw.py --run validation-vlm-8b-brief-t320  --shards 0 --no-count-gate
+py -3.12 scripts/audit_vlm_raw.py --run validation-vlm-8b-strict-t320 --shards 0 --no-count-gate
+```
+
+`--predictions` now defaults correctly from the `validation-` prefix, and passing the wrong file is
+refused rather than mislabelled. `--no-count-gate` skips only the *published test counts* gate; the
+row-by-row replay gate still runs and must still pass.
+
+### The baseline to beat, measured today on the same 159 rows
+
+`validation-vlm-qwen3vl8b-brief` (the existing run, 128 tokens):
+
+| | rows | share |
+|---|---|---|
+| usable sentinel answers | 75 | **47.2%** |
+| coverage hole | 84 | 52.8% |
+| — truncated (no `ANSWER:`) | 46 | 28.9% |
+| — refusal | 19 | 11.9% |
+| — sig-figs rounded to 0 | 8 | 5.0% |
+| — genuinely stationary (not addressable) | 7 | 4.4% |
+
+**The 159-row split is representative for coverage**, which is the reason it can be used here at all:
+it shows 47.2% sentinel against the test split's 49.2%, and 45.9% addressable against 43.1%. Coverage
+is a *count*, so this split resolves it even though its MRA carries a ±5.7 pt CI and has misled this
+project three times.
+
+### Pre-commit the bar before looking at the numbers
+
+* **Run A passes if truncation drops from 46 rows to ≤ 10.** That is the fix's own mechanism; if
+  truncation survives a 2.5x cap, the diagnosis is wrong and `strict` should not be trusted either.
+* **Run B passes if sentinel ≥ 70% and zeros ≤ 10%** (refusal + sig-figs + bare, i.e. ≤ ~16 of 159).
+* **Only if B passes, spend the 4-shard test run** (~$8-12) and then one submission slot on the
+  rebuilt arm.
+* If A passes and B does not, ship A's config to test anyway -- truncation alone is worth **+0.024**
+  macro on the test split and needs no prompt change.
+
+### After the test run — do not skip this
+
+1. `scripts/vlm_predictions.py` to rebuild `vlm-*.predictions.csv` from the new raw replies.
+2. Re-derive the sentinel id lists; **every `data/probes/ids-*sentinel*.csv` file is keyed to the old
+   run** and will be wrong.
+3. `scripts/fuse_predictions.py` + `scripts/select_rows.py` to compose. **Re-optimise fusion** -- the
+   per-category optima (S2 weight 0.7 / cap 5, S3 weight 0.3, D2 and D3 VLM-alone) were measured
+   against the *old* arm and will move. One slot, four channels.
+4. Hold at least one channel as a byte-identical lock and confirm it returns its previous value to
+   the digit. That control has passed **8 times** and is the most reliable instrument here.
+
+### Operational traps, all of them already paid for once
+
+* **`RUN_NAME` must change whenever the prompt or the cap changes**, or checkpoint resume replays
+  stale replies and measures nothing. The two names above are new.
+* **Keep `VLM_MAX_SIDE` at 768.** All four test shards once OOMed on a 22 GB L4 at native resolution,
+  and the checkpoint saved the run but not the hours.
+* `--detach` is not optional on HF Jobs.
+* The raised cap costs decode time only on rows that were being truncated, since generation halts at
+  EOS -- but the test run is 4 shards x ~822 rows at 6-10 s/row, so budget 2-3 h per shard rather
+  than 1.5-2.5.
+
+### Still true, and still the reason not to spend a slot
+
+Champion is **`mix-v21`, 0.500** (S2 0.475, D2 0.540, S3 0.510, D3 0.475), derived from measured
+channels. **The combination space is closed** -- all four categories at their argmax or refuted, 14
+probes for +0.009 total. Do not open it again. The whole remaining opportunity is the **1,416
+addressable rows (43.1% of the test set), ceiling ~0.542**, and it is bought with GPU, not slots.
 
 ## 2026-08-30 (part 2) — the combination space is CLOSED, and the real constraint is coverage
 

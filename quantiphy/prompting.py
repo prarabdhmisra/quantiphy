@@ -53,11 +53,34 @@ _SYSTEM_BASE = (
 #:
 #: ``brief`` is the incumbent and stays the default: every ``prompt_sha`` recorded so far is a brief
 #: prompt, and moving the default would make a resumed run non-comparable with its own checkpoint.
+#:
+#: ``strict`` is added 2026-08-30 to answer two *measured* defects in ``brief``'s 3,289 test replies
+#: (``scripts/audit_vlm_raw.py``), and it is a third style rather than an edit to ``brief`` for the
+#: reason above -- ``brief`` is the measured baseline and the A/B is the point.
+#:
+#: * **457 replies refuse**, saying the quantity "cannot be determined without a reference" while the
+#:   prompt is supplying one. Concentrated in D2 (218) and D3 (171), the two categories the VLM
+#:   otherwise wins. So ``strict`` states that declining is not an available answer and that the
+#:   reference given *is* the reference.
+#: * **118 replies compute a real value and answer ``0``**, i.e. a sub-metre magnitude rounded to an
+#:   integer. So ``strict`` asks for two significant figures and rules out zero explicitly.
+#:
+#: **This is not the downward nudge the module docstring refuses.** Forbidding a zero and requiring
+#: two significant figures constrains the *format*; it does not move the estimate in either
+#: direction, and a zero is not a small answer under MRA -- it is a hard zero, scoring exactly the
+#: same as a 100x overshoot. The one-sentence limit is also tighter than ``brief``'s "one or two",
+#: which helps the truncation fix rather than substituting for it.
 _STYLES = {
     "brief": ("Reason briefly, then give a single number.",
               "Keep any reasoning to one or two sentences, then end with exactly:"),
     "direct": ("Give a single number and nothing else.",
                "Give the number only, with no explanation, as exactly:"),
+    "strict": ("Reason in one short sentence, then give a single number. Always give a number: the "
+               "reference measurement you are given is the reference you need, so never reply that "
+               "the quantity cannot be determined, and never answer zero. If you are unsure, "
+               "estimate.",
+               "Give at least two significant figures, and never 0. Keep reasoning to one short "
+               "sentence, then end with exactly:"),
 }
 
 

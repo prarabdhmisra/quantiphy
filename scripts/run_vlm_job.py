@@ -55,8 +55,11 @@ Environment:
     RUN_NAME          output folder, default "<split>-vlm-<model tail>"
     SHARD             "k/n" contiguous slice, as in run_vision_job.py
     LIMIT             row cap, for a smoke test
-    VLM_PROMPT        "brief" (default, mild CoT) or "direct" (no reasoning at all)
+    VLM_PROMPT        "brief" (default, mild CoT), "direct" (no reasoning), or "strict"
+                      (one sentence, no declining, no zero, 2 sig figs -- see prompting.py)
     VLM_FRAMES        frames per question, default 12
+    VLM_MAX_NEW_TOKENS  generation budget per reply, default 320 -- was 128 and truncated 841 of
+                      3,289 test replies before the ANSWER: marker; see vlm.py
     VLM_MAX_SIDE      longest frame side in px, default 768 -- a memory bound, see vlm.py
     VLM_4BIT          "1" to load 4-bit -- fits a 32B on a 40 GB A100 or Kaggle's 2x16 GB
     QUANTIPHY_GIT     pip-installable source, when the package is not already importable
@@ -219,7 +222,7 @@ def main() -> int:
     from huggingface_hub import HfApi
     from tqdm import tqdm
 
-    from quantiphy.backends.vlm import MAX_FRAME_SIDE, VlmBackend
+    from quantiphy.backends.vlm import DEFAULT_MAX_NEW_TOKENS, MAX_FRAME_SIDE, VlmBackend
     from quantiphy.parsing import build_request
     from quantiphy.prompting import build_prompt, parse_answer, system_prompt
 
@@ -234,10 +237,13 @@ def main() -> int:
 
     backend = VlmBackend(model_id,
                          frames=int(os.environ.get("VLM_FRAMES", 12)),
+                         max_new_tokens=int(os.environ.get("VLM_MAX_NEW_TOKENS",
+                                                           DEFAULT_MAX_NEW_TOKENS)),
                          load_in_4bit=os.environ.get("VLM_4BIT") == "1",
                          max_frame_side=int(os.environ.get("VLM_MAX_SIDE", MAX_FRAME_SIDE)))
     log(f"model {model_id}  4bit={backend.load_in_4bit}  frames={backend.frames}  "
-        f"prompt={style}  max_side={backend.max_frame_side}")
+        f"prompt={style}  max_side={backend.max_frame_side}  "
+        f"max_new_tokens={backend.max_new_tokens}")
     log(f"device {backend.device}")
 
     prior_column = "ground_truth_prior" if "ground_truth_prior" in frame.columns else "prior"
