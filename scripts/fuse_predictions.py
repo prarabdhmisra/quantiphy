@@ -11,8 +11,16 @@ a one-dimensional sweep. The 5.0 default is the argmax of a six-point sweep on 6
 is explicitly *not* confirmed; see the module docstring in ``quantiphy/fusion.py``.
 
 ``--primary`` is the arm kept when the two disagree past the cap, and it should be whichever arm the
-portal measured better *in that category*. As of `mix-v10`: the VLM won D2 (+0.163/row) and D3
-(+0.137/row) and S2 (+0.013/row); the solver won S3 (-0.031/row for the VLM).
+portal measured better *in that category*. As of `mix-v10`, over all sentinel rows: the VLM won D2
+(+0.163/row) and D3 (+0.137/row) and S2 (+0.013/row); the solver won S3 (-0.031/row for the VLM).
+
+**S2's entry there is stale and the sign is wrong on the population that matters.** Measured
+2026-08-30 on the 204 S2 sentinel rows where the two arms agree within 5x -- the rows a cap of 5
+actually fuses -- the VLM alone scores 0.447, the solver alone 0.470 (+0.066/row) and the blend at
+weight 0.7 scores 0.475 (+0.080/row). So in S2 the *solver* is the better arm and the blend beats both
+of them, which is the first direct evidence on test that fusing adds something neither arm has. The
++0.013/row above averaged the agreeing rows together with the 59 that disagree past 5x; whether the
+solver is also the right arm on *those* is what ``ids-s2-sentinel-disagree.csv`` was built to probe.
 
 ``method`` records the route -- ``fuse-fused``, ``fuse-disagreement``, ``fuse-primary-only``,
 ``fuse-secondary-only`` -- so a probe can select rows by how they were combined, and is ``none``

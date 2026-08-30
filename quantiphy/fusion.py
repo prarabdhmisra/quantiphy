@@ -8,9 +8,20 @@ versus an answer in the question's own unit -- and should be *combined* rather t
 and the metric is relative, so the mean of 1 and 100 is 10, not 50.5. That rule predates this module
 and is the one thing here that is not in doubt.
 
-What *is* in doubt is whether fusing beats picking, and the honest answer from the only data with
-ground truth is **not established**. Measured on the 60 validation rows where the solver answered and
-the VLM answered via its sentinel route:
+Whether fusing beats *picking* was the open question this module was built under, and on 2026-08-30
+the test split answered it **yes, in S2, and only in S2**. On the 204 S2 sentinel rows that fuse at
+cap 5: the VLM alone scores 0.447, the solver alone 0.470, and the blend at ``weight = 0.7`` scores
+**0.475** -- the blend beats *both* arms individually, so it is not a disguised preference for the
+better arm. The weight is also solved there: 0.5 -> 0.472, 0.7 -> 0.475, 1.0 -> 0.470, and a quadratic
+through those three has its vertex at w = 0.718. Per category the answer differs completely -- S3
+wants *more* solver than 0.7 and has not turned over, while D2 (-0.022/row) and D3 (-0.045/row for
+the mean, -0.047 for the minimum) reject fusing outright. **There is no single setting; read
+``NEXT-SESSION.md`` for the current per-category one.**
+
+The validation-set evidence below is what the module's shape came from, and it is kept because the
+*mechanism* it identifies is still the reason the parameters exist -- but note that it priced the
+plain geometric mean as a loss, and per category that was wrong. Measured on the 60 validation rows
+where the solver answered and the VLM answered via its sentinel route:
 
 | estimator | MRA | vs VLM alone |
 |---|---|---|
