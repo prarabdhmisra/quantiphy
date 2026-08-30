@@ -1,6 +1,6 @@
 # Resume here
 
-Last worked: **2026-08-29**.
+Last worked: **2026-08-30**.
 
 > **THE PORTAL IS LIVE.** The single most important thing on this page. Submissions are scored on
 > upload and return a per-category MRA immediately, 3 per UTC day. Everything below that says
@@ -22,42 +22,182 @@ Last worked: **2026-08-29**.
 > `C:\Users\prara_\quantiphy\NEXT-SESSION.md` first. Repo is public at
 > https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (286 tests
 > green). **The portal is live and scores on upload, 3/day — read "Submitting".** Champion is
-> **`mix-v14`, macro 0.498** on the board (S2 0.475, D2 0.540, S3 0.506, D3 0.471) -- **past
-> GPT-5.1's 0.4856 and well past the paper's best open-weight, 0.460, using an 8B model.**
+> **`mix-v17`, macro 0.500** (S2 0.475, D2 0.540, S3 0.509, D3 0.475) -- **past GPT-5.1's 0.4856 and
+> well past the paper's best open-weight, 0.460, using an 8B model.** `mix-v17` is DERIVED from four
+> already-measured channels, so **do not spend a slot confirming it**, and **do not submit `mix-v15`
+> either** -- `mix-v16`'s D3 lock confirmed its arithmetic for free.
 >
-> **SUBMIT `mix-v15` FIRST, before anything else.** It is built, validated and unsubmitted, and it
-> is free arithmetic rather than a hypothesis: `mix-v14` with D3 reverted to `mix-v10`'s value,
-> because the D3 channel of `mix-v14` was a probe that lost. Predicted **0.499** (S2 0.475, D2 0.540,
-> S3 0.506, D3 0.475). Per-category composition has now been exact **five** times; if this one is not
-> 0.499 then something in the pipeline changed and nothing else that day should be believed.
+> **SUBMIT `mix-v18` FIRST.** Built, validated, unsubmitted. Two probes on `mix-v17` and two locks,
+> and both probes read their value from `replay-full.submission.csv` -- the solver's own answer -- so
+> nothing is fitted. **S2:** the solver instead of the VLM on the 59 sentinel rows where the two arms
+> disagree past 5x (leverage 0.1015). **S3:** fusion weight 0.0, the solver alone, completing the
+> sweep after 0.5 and 0.3 (leverage 0.3576). D2 and D3 are locks and must return 0.540 and 0.475.
 >
-> Read "2026-08-29" first — it spent three slots and closed two questions. **Fusing the solver into
-> the VLM is now a settled, per-category question, not an open one:** it WINS in S2 (+0.071/row, and
-> weight 0.7 beats 0.5 by a further +0.009/row), is NULL in S3 (+0.006/row), and LOSES in D2
-> (-0.022/row) and D3 (-0.045/row for the geometric mean, -0.047/row for prefer-lower). **D3 has now
-> rejected both blends, so stop offering the solver to D3 sentinel rows.** The `last-number` parse
-> route is REFUTED outright, 4 categories for 4 (`mix-v11`, -0.106 to -0.253/row) -- keep excluding
-> those 756 rows and never overlay them again.
+> Read "2026-08-30" first — one slot, and it closed more than it scored. **The S2 fusion weight is
+> SOLVED at 0.7**: w=1.0 lost -0.0146/row, so a quadratic through 0.5/0.7/1.0 has its vertex at
+> w=0.718 with a gain of 2e-05 over where we already are. Stop probing it. **The 2026-08-29 "different
+> solver input" confound on S2 is VOID** -- `mix-v10`'s value on those 204 rows is the VLM's own answer
+> on 204 of 204 rows, so there was never a solver in the base. What replaces it is the campaign's best
+> result: on those rows the VLM alone scores 0.447, the solver alone 0.470, and **the blend at w=0.7
+> scores 0.475 -- fusion beats both arms individually**, which is the first direct evidence on test
+> that it adds something neither arm has. It also means **S2's `--primary` is set to the worse arm**,
+> which is what `mix-v18` probes. **S3 moves the other way**: weight 0.5 -> 0.3 gains +0.0084/row, so
+> S3 wants *more* solver while S2 loses at 100% solver. There is no single fusion setting for this
+> dataset.
 >
-> **The open S2 question is the one with momentum**, and it is free: weight 0.5 -> 0.7 gained
-> +0.009/row on 204 rows, so weight 1.0 (the solver alone on exactly those rows) is the obvious next
-> probe and needs no new compute. **D3 remains 80% of the gap to GPT-5.1** (-0.112) and is now only
-> reachable by a better VLM, not by the solver -- item C, Qwen3-VL-32B in 4-bit, ~$25-40, needs
-> sign-off.
+> **`replay-full.csv` is on disk and it is the full solver arm again** -- 2,585/3,289 solved, the
+> harness self-gate passed, and it matches `replay-reconstructed.csv` to 1.9e-13 on all 1,307 fused
+> rows. Re-running `replay_cache.py` is free (no GPU, cached detections, ~2 s), so never work around a
+> missing replay again. That unblocks 1,278 solver rows, including the 59 S2 and 120 D3 sentinel rows
+> the disagreement cap had thrown away, and it unblocks cap probing.
 >
-> **`replay-tangential.csv` is GONE** (`replay-*.csv` is gitignored) and you do not need it: at
-> `weight == 0.5` the fused value is invertible, so `solver = fused ** 2 / vlm` recovers the solver
-> arm exactly on every `fuse-fused` row. `replay-reconstructed.csv` is rebuilt that way and the
-> property is pinned by `test_the_unweighted_mean_recovers_either_arm_from_the_other`. It only covers
-> fused rows -- the 120 D3 rows capped out by disagreement are NOT recoverable, so any probe that
-> needs those must re-run `replay_cache.py` against the Hub's detection cache first.
->
-> **Everything geometric is now worth thousandths; the VLM arm is the top item.** Read "2026-08-27"
-> then "2026-08-26" before proposing a lever. **Six single-cause theories of the 3D bias have been
-> refuted and the seventh was real:** the radial correction was applied to the target and never to
-> the prior, which could only ever fire in D3. **Constant-multiplier probing is exhausted** (8 group
-> probes, 8 losses). Item 1k (the gravity prior) is re-sized and **not free**: its 46 videos are all
-> detection-cache misses. Ask me before spending more than ~$20 in a session.
+> **D3 remains the largest gap** (0.475) and is still only reachable by a better VLM, not by the
+> solver -- item C, Qwen3-VL-32B in 4-bit, ~$25-40, needs sign-off. Everything geometric is now worth
+> thousandths. **Constant-multiplier probing is exhausted** (8 group probes, 8 losses). The
+> `last-number` parse route is REFUTED outright, 4 categories for 4 -- keep excluding those 756 rows.
+> Item 1k (the gravity prior, 291 declines) is **not free**: its 46 videos are all detection-cache
+> misses. Ask me before spending more than ~$20 in a session.
+
+## 2026-08-30 — one slot, and it solved a parameter, reversed a trend, and voided a confound
+
+Slot 1 spent: `mix-v16`. Board **0.498 -> 0.500** by composition. The score moved two thousandths;
+the readings are worth much more than that.
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| `mix-v15` (derived) | 0.475 | 0.540 | 0.506 | 0.475 | 0.499 |
+| `mix-v16` | 0.470 | **0.540** | **0.509** | **0.475** | **0.499** |
+| | weight 1.0 | LOCK | weight 0.3 | LOCK | |
+| leverage | 0.343 | | 0.358 | | |
+| **per row** | **-0.0146** | | **+0.0084** | | |
+
+**D2 returned 0.540 and D3 returned 0.475 to the digit.** Sixth exact composition. It also means
+**`mix-v15` never has to be submitted** -- it is `mix-v14` with exactly this D3 channel, and this
+channel just measured 0.475, so its 0.499 is confirmed arithmetic. **A slot saved; do not spend one
+on `mix-v15`.**
+
+### The S2 fusion weight is SOLVED at 0.7, and the trend that pointed past it was a curve
+
+"More solver is better twice, so try the solver alone" was the pre-sized next step and it is
+**refuted**. Three points on the same 199 rows, all against the same solver arm:
+
+| weight on the solver | S2 | vs w=0.5 |
+|---|---|---|
+| 0.5 (`mix-v13`) | 0.472 | |
+| **0.7 (`mix-v14`)** | **0.475** | +0.003 |
+| 1.0 (`mix-v16`) | 0.470 | -0.002 |
+
+A quadratic through those three puts the vertex at **w = 0.718** and the gain over w = 0.7 at
+**2 x 10^-5**. That is four orders of magnitude below the reporting precision. **Stop probing the S2
+fusion weight -- it is at its argmax and the curve is flat there.** Two monotone points do not make a
+monotone function, and this is the cheapest possible reminder of it.
+
+### The 2026-08-29 S2 confound is VOID, and what replaces it is the best result of the campaign
+
+`mix-v13`'s note warned that "some part of the +0.071/row may be the different solver input rather
+than fusion", because the fused arm came from `replay-tangential` at band `(30, inf)` while
+`mix-v10`'s S2 came from `solver-v4` at the S2 floor of 0. **That warning was wrong, and it is
+checkable in one query.** `mix-v10`'s value on the 204 fused S2 rows equals the VLM's own answer on
+**204 of 204** rows, exactly -- those rows are inside the 1,619 sentinel rows `mix-v9` overlaid, so
+the solver was never in `mix-v10`'s S2 there at all. There is no solver-input confound because there
+was no solver.
+
+So the three-way comparison on the same 204 rows is clean, and it is the one the whole fusion
+hypothesis needed:
+
+| arm, on the 204 fused S2 sentinel rows | S2 | vs the VLM alone | per row |
+|---|---|---|---|
+| VLM alone (`mix-v10`) | 0.447 | | |
+| solver alone (`mix-v16`, w = 1.0) | 0.470 | +0.023 | +0.066 |
+| **blend at w = 0.7 (`mix-v14`)** | **0.475** | **+0.028** | **+0.080** |
+
+**The blend beats both arms individually.** That is the first direct evidence on test that fusion
+adds something neither arm has, rather than being a disguised preference for the better arm -- and
+the premise `quantiphy/fusion.py` was built on ("truth lies between the two arms") was only 46.7%
+true on 60 validation rows, so the module's own docstring called it "not established". It is
+established now, in S2, at cap 5.
+
+**It also reverses which arm S2 should trust.** `fuse_predictions.py`'s docstring records the VLM as
+winning S2 by +0.013/row as of `mix-v10` -- nearly a tie. On the rows where the two arms agree within
+5x, the solver wins by +0.066/row. **S2's `--primary` is set to the worse arm.** That is what
+`mix-v18` probes below.
+
+### S3 wants MORE solver, which is the opposite sign to S2
+
+S3 weight 0.5 -> 0.3 gains **+0.0084/row** on 206 rows. S3's primary is the solver, so a lower weight
+means *more* solver, and S3's fusion at w = 0.5 was a null (+0.006/row) -- so the whole of S3's
+fusion value may be that it lets the solver dominate. The endpoint w = 0.0 (the solver alone) is the
+obvious next point and it completes a three-point sweep exactly as S2's did. In `mix-v18`.
+
+**Note the asymmetry, because it is the finding.** S2 wants ~70% solver and loses at 100%. S3 wants
+more than 70% solver and has not yet turned over. D2 and D3 reject the solver entirely. There is no
+single fusion setting for this dataset and there was never going to be one.
+
+### `replay_cache.py` was re-run, and the full solver arm is back on disk
+
+`replay-reconstructed.csv` only ever covered the 1,307 rows that fused at cap 5, which blocked every
+probe needing a solver value on a row the cap had rejected. Re-running the replay costs nothing -- no
+GPU, no video, cached detections, about two seconds of solve:
+
+```bash
+py -3.12 scripts/replay_cache.py --split test --run test-solver-v1 --shards 4 \
+    --trusted-prior-pixels 30,inf --out replay-full.csv
+```
+
+**2,585 of 3,289 solved (78.6%)** -- S2 497/581, D2 863/1160, S3 519/576, D3 706/972. Two independent
+confirmations that it is the *same* arm as the one behind `mix-v13`/`mix-v14`'s fused values:
+
+* the harness self-gate passed -- "reproduces solver-v1 exactly (1338 solved, all four rates match)";
+* it agrees with `replay-reconstructed.csv` to **1.9 x 10^-13** on all **1,307** fused rows.
+
+That adds **1,278 solver rows** the campaign could not reach yesterday: S2 251, D2 405, S3 226, D3
+396. The immediate unblock is the sentinel rows the disagreement cap threw away:
+
+| sentinel rows, both arms answering | total | <=5x (fused) | 5-10x | 10-25x | >25x | **capped out** |
+|---|---|---|---|---|---|---|
+| S2 | 263 | 204 | 33 | 15 | 11 | **59** |
+| D2 | 406 | 323 | 34 | 28 | 21 | 83 |
+| S3 | 261 | 206 | 27 | 17 | 11 | 55 |
+| D3 | 316 | 196 | 43 | 47 | 30 | 120 |
+
+### BUILT and unsubmitted: `mix-v17` (champion, derived) and `mix-v18` (two probes)
+
+**`mix-v17` is the champion at 0.500 and must NOT be submitted.** It is `mix-v16` with S2 reverted to
+weight 0.7, i.e. `mix-v14`'s S2 + `mix-v10`'s D2/D3 + `mix-v16`'s S3. Macro 0.49975 is arithmetic
+from four already-measured channels. Standing rule: never spend a slot confirming a composition.
+
+**`mix-v18` is the next slot.** Two probes on top of `mix-v17`, two locks, and both probes take their
+value from the same source -- `replay-full.submission.csv`, the solver's own answer -- so no fusion
+run is involved and nothing is fitted:
+
+| channel | change | rows | leverage |
+|---|---|---|---|
+| **S2** | the solver instead of the VLM where the two disagree past 5x (`--primary S2=solver`) | 59 | 0.1015 |
+| D2 | LOCK | 0 | |
+| **S3** | fusion weight 0.0, the solver alone, completing the sweep after 0.5 and 0.3 | 206 | 0.3576 |
+| D3 | LOCK | 0 | |
+
+`data/probes/ids-s2-sentinel-disagree.csv` (59 ids) is new and disjoint from the fused 204. Predicted
+0.500 if both probes are null. Both channels are revertible offline for free, so the worst case is a
+day that costs one slot and closes two questions.
+
+### What to build next, in order
+
+1. **`mix-v18`** -- built, validated, unsubmitted. Send it. Two independent readings, two locks.
+2. **The S2 cap bracket, now unblocked.** If `mix-v18`'s S2 channel says the solver is the right arm
+   past the cap, the next question is whether those 59 rows should be *blended* instead of switched
+   -- cap 10 and cap 25 at w = 0.7 are one channel each and `replay-full.csv` now covers them. If it
+   says the VLM is right past the cap, the cap is confirmed at 5 and S2 is finished.
+3. **S3's endpoint, depending on `mix-v18`.** If w = 0.0 wins, S3's fusion is just "use the solver"
+   and the 55 capped-out S3 rows should get the solver too. If it turns over, fit the vertex from
+   three points as S2's was and stop.
+4. **Qwen3-VL-32B in 4-bit, ~$25-40, still needs sign-off.** **D3 is still the largest gap** -- 0.475
+   against GPT-5.1's D3 and against the paper's 0.534 for the 32B standalone -- and four probes now
+   (`mix-v13` D2, `mix-v13` D3, `mix-v14` D3 prefer-lower, and the two estimators agreeing) say it is
+   not reachable from the solver side. `VLM_4BIT=1`, `a100-large` and `VLM_MAX_SIDE` are wired.
+
+**Still deprioritised: anything that offers the solver to D2 or D3 sentinel rows.** Three probes,
+three losses, two independent estimators agreeing on D3.
 
 ## 2026-08-29 — three slots, one refutation, one win, and the champion at 0.498
 
