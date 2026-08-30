@@ -27,11 +27,15 @@ Last worked: **2026-08-30**.
 > already-measured channels, so **do not spend a slot confirming it**, and **do not submit `mix-v15`
 > either** -- `mix-v16`'s D3 lock confirmed its arithmetic for free.
 >
-> **SUBMIT `mix-v18` FIRST.** Built, validated, unsubmitted. Two probes on `mix-v17` and two locks,
-> and both probes read their value from `replay-full.submission.csv` -- the solver's own answer -- so
+> **SUBMIT `mix-v19` FIRST.** Built, validated, unsubmitted. Three probes on `mix-v17` and one lock,
+> and every probe reads its value from `replay-full.submission.csv` -- the solver's own answer -- so
 > nothing is fitted. **S2:** the solver instead of the VLM on the 59 sentinel rows where the two arms
 > disagree past 5x (leverage 0.1015). **S3:** fusion weight 0.0, the solver alone, completing the
-> sweep after 0.5 and 0.3 (leverage 0.3576). D2 and D3 are locks and must return 0.540 and 0.475.
+> sweep after 0.5 and 0.3 (leverage 0.3576). **D3:** the solver on the 142 sentinel rows where it took
+> one of its two *good* D3 routes (leverage 0.1461) -- see "route selection" below, this is the
+> partition "D3 is closed to the solver" was never measured over. D2 is the lock and must return
+> 0.540. (`mix-v18` was the same thing without the D3 channel; it was superseded before upload and
+> should not be sent.)
 >
 > Read "2026-08-30" first — one slot, and it closed more than it scored. **The S2 fusion weight is
 > SOLVED at 0.7**: w=1.0 lost -0.0146/row, so a quadratic through 0.5/0.7/1.0 has its vertex at
@@ -160,30 +164,67 @@ That adds **1,278 solver rows** the campaign could not reach yesterday: S2 251, 
 | S3 | 261 | 206 | 27 | 17 | 11 | 55 |
 | D3 | 316 | 196 | 43 | 47 | 30 | 120 |
 
-### BUILT and unsubmitted: `mix-v17` (champion, derived) and `mix-v18` (two probes)
+### BUILT and unsubmitted: `mix-v17` (champion, derived) and `mix-v19` (three probes)
 
 **`mix-v17` is the champion at 0.500 and must NOT be submitted.** It is `mix-v16` with S2 reverted to
 weight 0.7, i.e. `mix-v14`'s S2 + `mix-v10`'s D2/D3 + `mix-v16`'s S3. Macro 0.49975 is arithmetic
 from four already-measured channels. Standing rule: never spend a slot confirming a composition.
 
-**`mix-v18` is the next slot.** Two probes on top of `mix-v17`, two locks, and both probes take their
-value from the same source -- `replay-full.submission.csv`, the solver's own answer -- so no fusion
-run is involved and nothing is fitted:
+**`mix-v19` is the next slot.** Three probes on top of `mix-v17` and one lock, and every probe takes
+its value from the same source -- `replay-full.submission.csv`, the solver's own answer -- so no
+fusion run is involved and nothing is fitted:
 
 | channel | change | rows | leverage |
 |---|---|---|---|
 | **S2** | the solver instead of the VLM where the two disagree past 5x (`--primary S2=solver`) | 59 | 0.1015 |
 | D2 | LOCK | 0 | |
 | **S3** | fusion weight 0.0, the solver alone, completing the sweep after 0.5 and 0.3 | 206 | 0.3576 |
-| D3 | LOCK | 0 | |
+| **D3** | the solver on the sentinel rows where it took one of its two good D3 *routes* | 142 | 0.1461 |
 
-`data/probes/ids-s2-sentinel-disagree.csv` (59 ids) is new and disjoint from the fused 204. Predicted
-0.500 if both probes are null. Both channels are revertible offline for free, so the worst case is a
-day that costs one slot and closes two questions.
+`data/probes/ids-s2-sentinel-disagree.csv` (59 ids) and `data/probes/ids-d3-good-route-sentinel.csv`
+(142 ids) are new. Predicted 0.500 if all three probes are null. Every channel is revertible offline
+for free, so the worst case is a day that costs one slot and closes three questions.
+
+`mix-v18` was this without the D3 channel and was superseded before upload. **Do not send it.**
+
+### D3's channel: route selection is the partition "D3 is closed to the solver" never used
+
+The 2026-08-27 note called route a partition the campaign had never used, and it still had not been
+used on test in D3. Two D3 solver populations measure *well*, and `mix-v9` handed both of them to the
+VLM wholesale when it overlaid all 1,619 sentinel rows without regard to route:
+
+* **`+prior-tangential` (240 rows in D3).** The 2026-08-27 fix. Its own before/after: median vs the
+  constant 1.235 -> 0.953, share over 1.9x (a hard zero) 41.7% -> 30.0%. `mix-v8` overlaid 174 of
+  them and measured **+0.084/row** against the constant, which is what reopened D3.
+* **`geometric-3d+radial` (66 rows).** 0.75x the constant with **51.5%** within 2x, against plain
+  `geometric-3d` at 2.29x with 27.2%. The solver's best D3 route by a wide margin.
+
+Their union, intersected with the VLM's sentinel rows, is **142 rows** -- 109 that agreed with the VLM
+within 5x and 33 that were capped out. All 142 change, at a median move factor of **2.29x**, which
+under MRA is the distance between scoring and a hard zero, so the reading will not be marginal.
+
+**The check that made this trustworthy:** the committed `ids-d3-prior-tangential.csv` (174 rows) is a
+strict subset of `replay-full`'s 240 -- zero rows outside it. The solver has not drifted since the
+measurement, so `mix-v8`'s +0.084/row applies to this population.
+
+**The prior is genuinely uncertain, which is why it is worth a channel.** The VLM beat the
+*tangential-fixed* solver in D3 by +0.137/row averaged over all sentinel rows. But that average is
+exactly the "good population averaged into a bad one" trap the route note warned about: plain
+`geometric-3d` sits at 2.29x the constant and drags the mean down. Either the routes separate D3's
+solver quality or they do not, and one channel settles it.
+
+### D2 has no lever, and that is now a finding rather than an omission
+
+D2 stays a lock because the partition is trivial, not because nothing was tried. Of D2's 863 solver
+answers, **830 (96.2%) take the single route `geometric-2d`**, with 28 on `+separation` and 5 on
+`+target-from-prior`. There is no good-versus-bad route split to select on -- "route-selected solver
+in D2" and "the solver in D2" are the same population, and the solver in D2 is measured and lost by
+-0.163/row. Fusion there lost too (-0.022/row, `mix-v13`). **D2 is closed until a new arm exists.**
 
 ### What to build next, in order
 
-1. **`mix-v18`** -- built, validated, unsubmitted. Send it. Two independent readings, two locks.
+1. **`mix-v19`** -- built, validated, unsubmitted. Send it. Three independent readings and one lock.
+   `mix-v18` is superseded; do not send it.
 2. **The S2 cap bracket, now unblocked.** If `mix-v18`'s S2 channel says the solver is the right arm
    past the cap, the next question is whether those 59 rows should be *blended* instead of switched
    -- cap 10 and cap 25 at w = 0.7 are one channel each and `replay-full.csv` now covers them. If it
