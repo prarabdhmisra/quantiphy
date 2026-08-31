@@ -23,8 +23,9 @@ Last worked: **2026-08-30**.
 > https://github.com/prarabdhmisra/quantiphy. Work on branch `fix/prior-grounding-phrase` (309 tests
 > green). **The portal is live and scores on upload, 3/day — read "Submitting".** Champion is
 > **`mix-v21`, macro 0.500** (S2 0.475, D2 0.540, S3 0.510, D3 0.475) -- **past GPT-5.1's 0.4856 and
-> well past the paper's best open-weight, 0.460, with an 8B model.** `mix-v21` is DERIVED from
-> measured channels, so **no slot is owed for it**.
+> well past the paper's best open-weight, 0.460, with an 8B model.** **`mix-v21` is MEASURED on the
+> board** (2026-08-31, `pass`, 0.0% invalid) and all four category bars returned the composed
+> prediction to the digit -- the ninth exact composition.
 >
 > **DO NOT SPEND A SLOT ON A COMBINATION PROBE. That space is closed** — read "2026-08-30 (part 2)"
 > first. All four categories are at their measured argmax or refuted: S2 weight solved at 0.7 and cap
@@ -73,10 +74,33 @@ Last worked: **2026-08-30**.
 > free in ~2 s, so never work around a missing replay. Ask me before spending more than ~$20 in a
 > session.
 
+## 2026-08-31 — `mix-v21` is MEASURED at 0.500, and composition held exact for the ninth time
+
+Uploaded 2026-08-31 19:06. `pass`, 0.0% invalid, 3,289 matched / 0 missing.
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| predicted by composition | 0.475 | 0.540 | 0.510 | 0.475 | 0.50000 |
+| **measured on the board** | **0.475** | **0.540** | **0.510** | **0.475** | **0.500** |
+
+**All four bars returned the derived value to the digit. Ninth exact composition.** The champion is
+no longer an arithmetic claim -- it is on the record, and it is the file every future arm is measured
+against.
+
+One substantive detail rather than a formality: S3's 0.510 was carried over from `mix-v20` and was
+flagged on 2026-08-30 as possibly rounding noise sitting at the instrument's precision floor. It
+landed 0.510, not 0.509. The `prefer_lower` win in S3 is real, if tiny.
+
+**This does not reopen the combination space.** Nothing was fitted here and no question was answered
+that was not already answered offline; the upload bought a record, not information. Every verdict in
+"2026-08-30 (part 2)" stands: S2 and S3 solved, D2 and D3 closed, route selection discredited. The
+remaining opportunity is still the 1,416 addressable coverage rows, ceiling ~0.542, and it is still
+bought with GPU rather than slots.
+
 ## RESUME HERE 2026-08-31 — steps 1 and 2 are DONE; tomorrow is two cheap validation runs
 
-Both fixes are committed and tested. **Nothing has been run on a GPU yet, and no submission slot is
-owed.** Tomorrow's first action is two 159-row validation runs, ~20 minutes and cents each.
+Both fixes are committed and tested. **Nothing has been run on a GPU yet.** `mix-v21` is on the
+board at 0.500 and no further slot is owed for a composition. Tomorrow's first action is two 159-row validation runs, ~20 minutes and cents each.
 
 ### What changed in the code (done, 323 tests green)
 
@@ -196,8 +220,8 @@ project three times.
 
 ### Still true, and still the reason not to spend a slot
 
-Champion is **`mix-v21`, 0.500** (S2 0.475, D2 0.540, S3 0.510, D3 0.475), derived from measured
-channels. **The combination space is closed** -- all four categories at their argmax or refuted, 14
+Champion is **`mix-v21`, 0.500** (S2 0.475, D2 0.540, S3 0.510, D3 0.475), **measured on the board
+2026-08-31**. **The combination space is closed** -- all four categories at their argmax or refuted, 14
 probes for +0.009 total. Do not open it again. The whole remaining opportunity is the **1,416
 addressable rows (43.1% of the test set), ceiling ~0.542**, and it is bought with GPU, not slots.
 
