@@ -37,3 +37,6 @@ replay-band*.csv
 band-mixed.predictions.csv
 clip-v1.predictions.csv
 slot3.predictions.csv
+
+# Private-repo PAT for HF Jobs -- never commit (see run_vlm_job.py GITHUB_TOKEN)
+.secrets.env

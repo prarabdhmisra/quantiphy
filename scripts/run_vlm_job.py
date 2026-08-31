@@ -63,6 +63,9 @@ Environment:
     VLM_MAX_SIDE      longest frame side in px, default 768 -- a memory bound, see vlm.py
     VLM_4BIT          "1" to load 4-bit -- fits a 32B on a 40 GB A100 or Kaggle's 2x16 GB
     QUANTIPHY_GIT     pip-installable source, when the package is not already importable
+    GITHUB_TOKEN      PAT for a PRIVATE source repo. Pass as a SECRET, never --env:
+                      `hf jobs inspect` echoes the environment dict in plaintext. Needs only
+                      read-only Contents scope on the one repo. Unset = anonymous clone.
 """
 
 from __future__ import annotations
@@ -83,6 +86,37 @@ def log(message: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {message}", flush=True)
 
 
+def _with_credentials(source: str) -> str:
+    """Inject a GitHub PAT into an https source URL, for a private repo.
+
+    The token arrives as a *secret* (``--secrets GITHUB_TOKEN=...``), never as ``--env``: ``hf jobs
+    inspect`` echoes the whole environment dict back in plaintext, so a token baked into
+    ``QUANTIPHY_GIT`` would be readable from job metadata by anyone who can see the job.
+
+    Injecting after the scheme rather than string-formatting the whole URL matters, because
+    ``git+https://host/o/r.git@ref`` already uses ``@`` for the ref. Credentials add a *second* one,
+    and the fallback clone below splits the ref off with ``partition("@")`` -- first match wins. So
+    the ref is always parsed from the clean URL, and credentials are added afterwards.
+    """
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if not token or "://" not in source:
+        return source
+    scheme, _, rest = source.partition("://")
+    host = rest.split("/", 1)[0]
+    if host != "github.com" or "@" in host:      # already carries credentials, or not GitHub
+        return source
+    return f"{scheme}://x-access-token:{token}@{rest}"
+
+
+def _redact(text: str) -> str:
+    """Never let a token reach a log line or an exception message."""
+    for name in ("GITHUB_TOKEN", "GH_TOKEN"):
+        token = os.environ.get(name)
+        if token:
+            text = text.replace(token, "***")
+    return text
+
+
 def install_solver() -> None:
     """Make ``quantiphy`` importable, installing from git only if it is not already there.
 
@@ -97,30 +131,35 @@ def install_solver() -> None:
     source = os.environ.get("QUANTIPHY_GIT")
     if not source:
         raise SystemExit("quantiphy is not importable and QUANTIPHY_GIT is unset")
-    log(f"installing {source}")
+    authed = _with_credentials(source)
+    log(f"installing {source}" + ("  (with GitHub credentials)" if authed != source else ""))
 
     # `hf jobs uv run` executes inside an ephemeral uv environment with **no pip in it**, so
     # `python -m pip` fails outright -- which is exactly how this script's first two launches died,
     # in seconds, on `No module named pip`. run_vision_job.py already carried this ladder; the VLM
     # arm had the naive version because it had never actually run. uv first, then pip for anywhere
     # else this runs (Colab, Kaggle, a plain venv), then a bare clone onto sys.path.
-    attempts = (["uv", "pip", "install", "-q", "--python", sys.executable, source],
-                [sys.executable, "-m", "pip", "install", "-q", source])
+    attempts = (["uv", "pip", "install", "-q", "--python", sys.executable, authed],
+                [sys.executable, "-m", "pip", "install", "-q", authed])
     for command in attempts:
         try:
             subprocess.check_call(command)
             return
         except (subprocess.CalledProcessError, FileNotFoundError, OSError) as error:
-            log(f"  {command[0]} install failed ({error}); trying the next option")
+            # `error` stringifies the whole command, tokenised URL included -- redact it.
+            log(_redact(f"  {command[0]} install failed ({error}); trying the next option"))
 
     # `git+<url>@<ref>` is pip syntax, not git's: `git clone` would take the whole thing as a URL.
     url = source.removeprefix("git+")
-    url, _, ref = url.partition("@")
+    url, _, ref = url.partition("@")          # parsed from the CLEAN url, before credentials
     checkout = WORK / "src"
     log(f"  falling back to a plain clone of {url}" + (f" at {ref}" if ref else ""))
     if not checkout.exists():
         clone = ["git", "clone", "--depth", "1"] + (["--branch", ref] if ref else [])
-        subprocess.check_call(clone + [url, str(checkout)])
+        try:
+            subprocess.check_call(clone + [_with_credentials(url), str(checkout)])
+        except subprocess.CalledProcessError as error:
+            raise SystemExit(_redact(f"clone failed: {error}")) from None
     sys.path.insert(0, str(checkout))
     import quantiphy  # noqa: F401  -- fail here, not 200 rows into the run
 
