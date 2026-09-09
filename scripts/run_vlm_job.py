@@ -55,6 +55,12 @@ Environment:
     RUN_NAME          output folder, default "<split>-vlm-<model tail>"
     SHARD             "k/n" contiguous slice, as in run_vision_job.py
     LIMIT             row cap, for a smoke test
+    ROW_IDS           comma-separated row indices to run, for a stratified subset. Exits rather
+                      than running short if any requested row is absent from the split.
+    PRIOR_SCALE       Experiment B: multiply the stated prior's magnitude by this factor before
+                      building the prompt (default 1.0 = untouched). Units, object names and any
+                      `t=` timestamp are preserved; only the number moves. Change RUN_NAME with it,
+                      or the checkpoint replays the unscaled replies.
     VLM_PROMPT        "brief" (default, mild CoT), "direct" (no reasoning), or "strict"
                       (one sentence, no declining, no zero, 2 sig figs -- see prompting.py)
     VLM_FRAMES        frames per question, default 12
@@ -73,6 +79,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -210,11 +217,68 @@ def apply_shard(frame):
         frame = frame.iloc[bounds[which - 1]:bounds[which]].copy()
         log(f"SHARD {which}/{count}: rows {bounds[which - 1]}..{bounds[which] - 1} "
             f"({len(frame)} of {bounds[-1]})")
+    row_ids = os.environ.get("ROW_IDS")
+    if row_ids:
+        wanted = [int(part) for part in row_ids.replace("\n", ",").split(",") if part.strip()]
+        frame = frame[frame["row_index"].isin(wanted)].copy()
+        missing = sorted(set(wanted) - set(frame["row_index"]))
+        log(f"ROW_IDS: {len(frame)} of {len(wanted)} requested rows selected"
+            + (f"; {len(missing)} not in split: {missing[:10]}" if missing else ""))
+        if len(frame) != len(wanted):
+            # A silently short row set would make a slope fit look converged on the wrong rows.
+            raise SystemExit(f"ROW_IDS selected {len(frame)} rows, expected {len(wanted)}")
     limit = os.environ.get("LIMIT")
     if limit:
         frame = frame.head(int(limit)).copy()
         log(f"LIMIT set: {len(frame)} rows")
     return frame
+
+
+# --- Experiment B: prior perturbation -------------------------------------------------------
+# Canonical copy lives in papers/quantiphy-physworld/analysis/perturb_prior.py, where a free CPU
+# gate asserts it moves every parsed SI value by exactly the factor over all 3,289 rows. Inlined
+# here because `hf jobs uv run` uploads this file alone -- the package comes from QUANTIPHY_GIT,
+# so importing it would mean pushing before every launch. Keep the two in sync by hand.
+_PERTURB_NUMBER = re.compile(r"(?<![A-Za-z0-9^./])(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)")
+_PERTURB_CLAUSE = re.compile(r"([\n;]+)")
+_PERTURB_TIME_PREFIX = re.compile(r"^\s*t\s*=\s*-?\d+(?:\.\d+)?\s*,", re.IGNORECASE)
+
+
+def _perturb_format(value: float) -> str:
+    if value == int(value) and abs(value) < 1e15:
+        return str(int(value))
+    text = f"{value:.6f}".rstrip("0").rstrip(".")
+    return text if text else "0"
+
+
+def scale_prior_text(text: str, factor: float) -> str:
+    """Multiply every magnitude in a prior string by ``factor``, preserving all other characters.
+
+    A leading ``t=0.6,`` names the instant the prior holds at. That is a TIME, not a magnitude --
+    scaling it would change the question's physics rather than its scale -- so it is protected.
+    """
+    if not text or not str(text).strip():
+        return text
+
+    out_parts = []
+    for part in _PERTURB_CLAUSE.split(str(text)):
+        if _PERTURB_CLAUSE.fullmatch(part) or not part.strip():
+            out_parts.append(part)
+            continue
+        prefix = ""
+        prefix_match = _PERTURB_TIME_PREFIX.match(part)
+        if prefix_match:
+            prefix = part[: prefix_match.end()]
+            part = part[prefix_match.end():]
+        cut = max(part.rfind("="), part.rfind("~"))
+        if cut < 0:
+            out_parts.append(prefix + part)
+            continue
+        label, right = part[: cut + 1], part[cut + 1:]
+        right = _PERTURB_NUMBER.sub(
+            lambda m: _perturb_format(float(m.group(1)) * factor), right, count=1)
+        out_parts.append(prefix + label + right)
+    return "".join(out_parts)
 
 
 def load_checkpoint(output_repo: str, name: str) -> tuple[dict, Path]:
@@ -286,6 +350,16 @@ def main() -> int:
     log(f"device {backend.device}")
 
     prior_column = "ground_truth_prior" if "ground_truth_prior" in frame.columns else "prior"
+
+    # Experiment B: rewrite the prior's stated magnitude, leaving the question, video, unit and
+    # any timestamp byte-identical. A scale-recovering method's answer must move linearly with
+    # this; a method emitting a category-typical magnitude will not move at all.
+    prior_scale = float(os.environ.get("PRIOR_SCALE", 1.0))
+    if prior_scale != 1.0:
+        before = str(frame[prior_column].iloc[0])
+        frame[prior_column] = frame[prior_column].map(
+            lambda text: scale_prior_text(text, prior_scale))
+        log(f"PRIOR_SCALE={prior_scale}: {before!r} -> {frame[prior_column].iloc[0]!r}")
     answered = 0
     with local.open("a", encoding="utf-8") as handle:
         for _, row in tqdm(list(frame.iterrows()), total=len(frame)):
