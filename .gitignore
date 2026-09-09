@@ -26,3 +26,6 @@ venv/
 # Never commit credentials.
 .env
 *.token
+
+# Working log: kept local. Public until 2026-09-09; withheld during double-blind review.
+NOTES.md
