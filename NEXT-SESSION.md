@@ -1,6 +1,10 @@
 # Resume here
 
-Last worked: **2026-08-30**.
+Last worked: **2026-09-12**. Champion is **`mix-v23`, macro 0.5195** (S2 0.475, D2 0.552,
+S3 0.510, D3 0.541) -- derived from measured channels, **built and validated, not yet on the board**.
+`mix-v22` is MEASURED at **0.511** and is the file the D2/D3 channels come from.
+**Read "2026-09-12" first.** `mix-v24` is built and is the one slot worth spending: it tests whether
+S2/S3 lost because the overlay bypassed fusion, with D2/D3 held as byte-identical locks.
 
 > **THE PORTAL IS LIVE.** The single most important thing on this page. Submissions are scored on
 > upload and return a per-category MRA immediately, 3 per UTC day. Everything below that says
@@ -73,6 +77,118 @@ Last worked: **2026-08-30**.
 > `replay-full.csv` is the full solver arm (2,585/3,289 solved) and `replay_cache.py` regenerates it
 > free in ~2 s, so never work around a missing replay. Ask me before spending more than ~$20 in a
 > session.
+
+## 2026-09-12 — `mix-v22` is MEASURED at 0.511, and the two losses name their own fix
+
+Uploaded 2026-09-12 08:14. `pass`, 0.0% invalid, 3,289 matched / 0 missing. **0.500 -> 0.511.**
+
+| | S2 | D2 | S3 | D3 | macro |
+|---|---|---|---|---|---|
+| `mix-v21` | 0.475 | 0.540 | 0.510 | 0.475 | 0.500 |
+| **`mix-v22`** | 0.447 | **0.552** | 0.502 | **0.541** | **0.511** |
+| delta | **-0.028** | +0.012 | **-0.008** | **+0.066** | +0.011 |
+
+**D3 +0.066 is the largest single-channel gain since the VLM arm itself landed.** The category that
+four independent partitions had closed to the solver was never a modelling problem -- it was a
+coverage hole, and filling it moved D3 further in one slot than every solver lever of the campaign
+combined.
+
+### The split is not noise, and it is not about which rows were recovered
+
+| channel | champion's recipe | what the overlay shipped | result |
+|---|---|---|---|
+| D2 | VLM alone | raw VLM — **matches** | **WON** +0.012 |
+| D3 | VLM alone | raw VLM — **matches** | **WON** +0.066 |
+| S2 | fuse, solver-weight 0.7 | raw VLM — **bypasses fusion** | LOST -0.028 |
+| S3 | fuse, solver-weight 0.3 | raw VLM — **bypasses fusion** | LOST -0.008 |
+
+**Both channels that matched the recipe won; both that bypassed it lost.** On a recovered row the
+overlay replaced *solver-alone* with *VLM-alone*, and S2's optimum is solver-heavy -- the weight curve
+has a measured interior vertex at 0.718, so VLM-alone is the worst of the three endpoints there.
+`fuse_predictions.py`'s own docstring has the numbers on S2's agreeing rows: **VLM alone 0.447**,
+solver alone 0.470, blend at 0.7 **0.475**. **`mix-v22`'s S2 measured 0.447.**
+
+So the reading is a **recipe mismatch, not bad rows** -- the recovered S2/S3 rows were fine, they were
+combined wrongly. `mix-v24` tests exactly that and nothing else.
+
+### The instrument note that matters most
+
+**Coverage was the right criterion and the validation MRA would have been a veto.** That reading was
+-0.017 and it was pointing at a submission worth **+0.011 on the board and +0.066 in D3**. It was
+measured against a *constant* fallback where the champion ships the *solver*, on 159 rows with a
++/-5.7 pt CI. Four times now this split has argued against something real. **Judge an arm change on
+coverage, which is a count; judge a combination change on the board.**
+
+### Built and ready, no GPU
+
+* **`mix-v23` — CHAMPION, derived, macro 0.5195.** `mix-v21` on S2/S3, `mix-v22` on D2/D3. Controls
+  verified byte-identical on all four channels. No slot owed for the composition, but it belongs on
+  the record once a slot is free, as `mix-v21` did.
+* **`mix-v24` — the probe, one slot.** S2's 170 recovered rows fused at weight 0.7 cap 5, S3's 210 at
+  weight 0.3 cap 5, both against `vlm-v2.predictions.csv`; **D2 and D3 byte-identical to `mix-v22`**
+  and must return 0.552 and 0.541. If a lock does not return exact, the build is wrong and S2/S3 must
+  not be read.
+
+**The combination space is reopened, and only because the arm changed.** The 2026-08-30 closure was
+always scoped to the *old* arm; `vlm-v2` is a new arm on 1,349 rows, so the per-category optima are
+open again on those rows only. This is not licence to re-probe the 1,619 untouched rows -- every
+verdict there still stands.
+
+## 2026-09-09 — the A/B was read at last: `strict` PASSES, the token cap ALONE FAILS
+
+**The two validation runs of 2026-08-31 completed that night and then sat unread for nine days.**
+Both were already paid for; reading them cost nothing. Nine days of slots (~27) went unspent while
+the answer was sitting on the Hub. *Read the runs you pay for, the day they land.*
+
+Judged against the bar pre-committed on 2026-08-31, before any number was seen:
+
+| run | config | sentinel coverage | truncated | refusals | verdict |
+|---|---|---|---|---|---|
+| baseline `validation-vlm-qwen3vl8b-brief` | `brief` @ 128 | 47.2% | 46 | 19 | — |
+| **A** `validation-vlm-8b-brief-t320` | `brief` @ 320 | 55.3% | **26** | 20 | **FAILS** (bar: truncation <= 10) |
+| **B** `validation-vlm-8b-strict-t320` | `strict` @ 320 | **86.2%** | **6** | **2** | **PASSES** (bar: sentinel >= 70%, zeros <= 10%) |
+
+Both audits pass their own re-parse self-gate, 159 of 159 rows.
+
+**Run A failing is a finding in its own right, and it corrects this document.** The 2026-08-30 audit
+named the hardcoded `max_new_tokens = 128` as *the* root cause of the 841 truncated rows and priced it
+at +0.024 macro for one constant. A 2.5x cap alone recovers only 46 -> 26 truncations and 8 points of
+coverage. **The prompt, not the cap, does the work** -- `strict` takes truncation to 6 and refusals
+from 19 to 2, because a prompt that demands one short sentence stops the model rambling into the wall
+in the first place. The two fixes are not additive and the cap was never the whole story.
+
+### The caution, recorded because it did not stop the spend
+
+Validation MRA did **not** improve: 0.4637 -> 0.4463, delta **-0.017**, 95% CI [-0.079, +0.044],
+p_no_improvement 0.71. **Not significant, and measured against the wrong counterfactual** -- that
+score fills unparsed rows from the *constant*, whereas the champion ships the **solver** on 1,339 of
+the 1,670 hole rows. The right comparison cannot be made offline: the solver was only ever replayed on
+20 of the 159 validation rows (`replay_cache.py --split validation` finds 14 cached pairs), so there
+is no free instrument for it. Coverage was the pre-committed criterion precisely because it is a
+*count*; this split's MRA carries a +/-5.7 pt CI and has misled this project three times.
+
+**D2 is the channel to watch** -- it fell hardest on validation (0.4649 -> 0.3865) and it is the
+board's best bar at 0.540. If it regresses on test it reverts to `mix-v21`'s channel by composition,
+free and with no second slot. That is what bounds the downside of the run below.
+
+### What was launched, and why it is an overlay rather than a re-run
+
+`test-vlm-8b-strict-t320-hole-shard1..4`, launched 2026-09-09 21:25 UTC, `strict` @ 320,
+`VLM_MAX_SIDE=768`, on the **1,670 hole rows only** (`data/probes/ids-vlm-hole.csv`, derived as
+`method != vlm-sentinel` in `vlm-v1.predictions.csv`), four jobs of ~418 rows each. Roughly half the
+cost and half the wall time of the full 3,289-row pass this document previously prescribed, and a
+strictly cleaner experiment: the 1,619 rows already winning are untouched, so the only rows that can
+move are the recovered ones. Validation showed `strict` brings no MRA gain on rows the VLM already
+answered, so nothing is forgone.
+
+**`ROW_IDS` cannot be combined with `SHARD`.** `apply_shard()` slices by `SHARD` first and then
+`ROW_IDS` raises `SystemExit` when the selection comes up short. Pass each quarter as its own job's
+`ROW_IDS` with no `SHARD` set; the `expb-*` jobs already do this.
+
+**`id` is `row_index + 1`.** `data/probes/ids-vlm-hole.csv` deliberately carries a `row_index` column
+and *not* an `id` column, so it can never be handed to `select_rows.py --overlay-ids` by mistake.
+Such a mix-up is silent, not loud: every row_index is also a valid submission id, so the overlay would
+land one row off on all 1,670 rows and still validate cleanly.
 
 ## 2026-08-31 — `mix-v21` is MEASURED at 0.500, and composition held exact for the ninth time
 
