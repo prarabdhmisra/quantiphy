@@ -32,6 +32,14 @@ Read off the live site and the HF commit log, not assumed:
   **S2 is a lock and must return 0.475.** Expected effect is tiny (~+0.001-0.003 macro).
   Replay against the refreshed parquet changes exactly 13 rows, all erratum rows -- the
   harness's solver-v1 self-gate now fails *because the parquet moved*, not because the harness broke.
+* **Phase 1 gate: SAM 2 is NOT justified -- tracking is not where the solver's error lives.**
+  `scripts/audit_tracks.py` (free, cached detections, VLM as the error proxy on 2,323 rows both arms
+  answer): 645 of 2,775 tracks are jumpy (>10% of steps leap), but jumpy tracks disagree with the VLM
+  no more than clean ones -- speed median |log(solver/vlm)| clean 1.006 vs jumpy 0.791, length 0.670
+  vs 0.832, overshoot share 0.27 vs 0.24 (speed). **Clean tracks are already ~2-3x off**, so the
+  error sits downstream of the track: scale from the prior, extent choice, or depth. Length runs
+  1.33x above the VLM even on clean tracks. Next instrument: a real solver run on all 159 validation
+  rows (only ~14-20 are cached), so the error can be decomposed against *truth*, stage by stage.
 * **Correction to this document:** "past GPT-5.1" compared against GPT-5.1's *validation* 0.4856. On
   test, the paper and the site put GPT-5.1 at **0.531** and humans at 0.556. 0.520 is below both.
 * **Organizers' email: "several submissions with scores above 0.70".** Track unstated. Every lever
