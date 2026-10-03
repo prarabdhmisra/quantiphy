@@ -1,10 +1,42 @@
 # Resume here
 
-Last worked: **2026-09-12**. Champion is **`mix-v23`, macro 0.5195** (S2 0.475, D2 0.552,
-S3 0.510, D3 0.541) -- derived from measured channels, **built and validated, not yet on the board**.
-`mix-v22` is MEASURED at **0.511** and is the file the D2/D3 channels come from.
-**Read "2026-09-12" first.** `mix-v24` is built and is the one slot worth spending: it tests whether
-S2/S3 lost because the overlay bypassed fusion, with D2/D3 held as byte-identical locks.
+Last worked: **2026-10-02**. **Read "2026-10-02" first** -- the deadline moved and the template changed.
+Champion is **`mix-v25`, MEASURED 0.521 on Track B** (S2 0.475, D2 0.553, S3 0.512, D3 0.544).
+Plan for the last three weeks: `~/.claude/plans/humming-spinning-diffie.md`.
+
+## 2026-10-02 -- deadline is Oct 23, nothing is on Track B, and the template changed
+
+Read off the live site and the HF commit log, not assumed:
+
+* **Final deadline moved EARLIER to Oct 23, 2026 23:59 AoE** (was Nov 5). Team edits close **Oct 9**.
+* **Every one of our 25 uploads is Track A.** The form now has a Track A / Track B selector. Track B is
+  our primary target and had no entry. **`mix-v23t` uploaded to Track B 2026-10-02/03: 0.520**, as
+  composed -- Track B is on the board. Roster confirmed before the Oct 9 lock.
+* **Board since 2026-09-12:** `mix-v23` measured **0.520** (composition exact, tenth time). `mix-v24`
+  measured **0.514** (S2 0.458, S3 0.504) -- fusing the recovered rows lost to `mix-v23` too, so
+  S2/S3 stay on `mix-v21`'s channel. Nothing uploaded after Sep 13.
+* **Template erratum 2026-09-14:** 32 target units corrected, 59 punctuation fixes, `question` only.
+  **Dataset fix 2026-09-28:** video_type on ids 1099-1100 (S2->S3) and 1985-1987 (D3->D2), plus
+  depth_info typos. The live template still has the *old* video_type on those 5 -- the organizers'
+  two files disagree; `tests/test_submission.py::RELABELLED_IDS` pins it. Both fixtures refreshed.
+* **Old submissions now FAIL `validate_submission.py`** (question column differs on 91 rows).
+  `mix-v23t.submission.csv` is `mix-v23`'s parsed_value strings, byte-identical, on the new template.
+  Do not rebuild through `make_submission.py` for a lock: `%.6g` reformats 72 values (rel 3e-6).
+* **Some of the 32 corrected rows were answered in the old wrong unit** (e.g. id 3204 is now a distance
+  in meters, we ship 24.5; id 2304 ships 3332 against 33.32 on its siblings). Next free fix.
+* **`mix-v25` -- MEASURED 0.521 on Track B (2026-10-03 09:39): S2 0.475 (lock held exact), D2 0.553 (+0.001), S3 0.512 (+0.002), D3 0.544 (+0.003). All three moved channels gained; the erratum fix is real.** `mix-v23t` with 16 corrected-unit rows changed, per
+  `data/probes/unit-erratum-2026-09-14.csv`: 9 rows (2303-2343) and 3204 shipped g*t in the wrong
+  unit (33.32 "m/s" for a cm/s answer) -> per-(category,unit) constant 102.65 / 1.25; 1131, 1225,
+  1631, 2668, 2673, 2678 -> solver replay on the corrected question. 23, 1665, 1668 kept: the replay's
+  walking speeds (11.3, 0.10, 0.03 m/s) are implausible. Changes: D3 11 rows, S3 4, D2 1, S2 0.
+  **S2 is a lock and must return 0.475.** Expected effect is tiny (~+0.001-0.003 macro).
+  Replay against the refreshed parquet changes exactly 13 rows, all erratum rows -- the
+  harness's solver-v1 self-gate now fails *because the parquet moved*, not because the harness broke.
+* **Correction to this document:** "past GPT-5.1" compared against GPT-5.1's *validation* 0.4856. On
+  test, the paper and the site put GPT-5.1 at **0.531** and humans at 0.556. 0.520 is below both.
+* **Organizers' email: "several submissions with scores above 0.70".** Track unstated. Every lever
+  recorded below sums to ~+0.05. Those teams are measuring, not prompting; the plan's main bet is
+  SAM 2 mask tracking for the solver, gated on a free track-quality audit of the cached detections.
 
 > **THE PORTAL IS LIVE.** The single most important thing on this page. Submissions are scored on
 > upload and return a per-category MRA immediately, 3 per UTC day. Everything below that says

@@ -21,7 +21,7 @@ id,video_id,video_source,video_type,fps,inference_type,question,ground_truth_pri
 20,simulation_0053,simulation,A2MC,30,DS,What is the length of the orange car in meters?,acceleration of the orange car = -2.86m/s^2,,
 21,simulation_0053,simulation,A2MC,30,DS,What is the length of the green car in meters?,acceleration of the orange car = -2.86m/s^2,,
 22,simulation_0053,simulation,A2MC,30,DS,What is the distance between the two black lamps in meters?,acceleration of the orange car = -2.86m/s^2,,
-23,simulation_0053,simulation,A2MC,30,DD,What is the walking speed of the person at 2.0s in meters?,acceleration of the orange car = -2.86m/s^2,,
+23,simulation_0053,simulation,A2MC,30,DD,What is the walking speed of the person at 2.0s in m/s?,acceleration of the orange car = -2.86m/s^2,,
 24,simulation_0054,simulation,A2MC,30,DD,What is the speed of the green car at 2.0s in m/s?,acceleration of the orange car = -2.86m/s^2,,
 25,simulation_0054,simulation,A2MC,30,DS,What is the length of the orange car in meters?,acceleration of the orange car = -2.86m/s^2,,
 26,simulation_0054,simulation,A2MC,30,DS,What is the length of the green car in meters?,acceleration of the orange car = -2.86m/s^2,,
@@ -31,14 +31,14 @@ id,video_id,video_source,video_type,fps,inference_type,question,ground_truth_pri
 30,simulation_0057,simulation,A2MC,30,DS,What is the length of the orange car in meters?,acceleration of the orange car = -2.86m/s^2,,
 31,simulation_0057,simulation,A2MC,30,DS,What is the distance between the two black lamps in meters?,acceleration of the orange car = -2.86m/s^2,,
 32,simulation_0057,simulation,A2MC,30,DS,What is the width of the orange car in meters?,acceleration of the orange car = -2.86m/s^2,,
-33,simulation_0068,simulation,A2MS,24,DD,What is the speed of the yellow car at 2.5s in m/s？,acceleration of the white car = 4m/s^2,,
+33,simulation_0068,simulation,A2MS,24,DD,What is the speed of the yellow car at 2.5s in m/s?,acceleration of the white car = 4m/s^2,,
 34,simulation_0068,simulation,A2MS,24,DS,What is the length of the turning yellow car in meters?,acceleration of the white car = 4m/s^2,,
 35,simulation_0068,simulation,A2MS,24,DS,What is the width of the turning yellow car in meters?,acceleration of the white car = 4m/s^2,,
 36,simulation_0068,simulation,A2MS,24,DS,What is the width of the white car in meters?,acceleration of the white car = 4m/s^2,,
-37,simulation_0068,simulation,A2MS,24,DS,What is the length of the white car in meters？,acceleration of the white car = 4m/s^2,,
+37,simulation_0068,simulation,A2MS,24,DS,What is the length of the white car in meters?,acceleration of the white car = 4m/s^2,,
 38,simulation_0069,simulation,A2MS,24,DD,What is the speed of the walking pedestrian at 1.0s in m/s?,acceleration of the white car = 4m/s^2,,
 39,simulation_0069,simulation,A2MS,24,DS,What is the width of the white car in meters?,acceleration of the white car = 4m/s^2,,
-40,simulation_0069,simulation,A2MS,24,DS,What is the length of the white car in meters？,acceleration of the white car = 4m/s^2,,
+40,simulation_0069,simulation,A2MS,24,DS,What is the length of the white car in meters?,acceleration of the white car = 4m/s^2,,
 41,simulation_0070,simulation,S2MS,24,SD,What is the speed of the turing yellow car at 2.5s in m/s?,length of the yellow car = 5.44m,,
 42,simulation_0070,simulation,S2MS,24,SS,What is the width of the turning yellow car in meters?,length of the yellow car = 5.44m,,
 43,simulation_0070,simulation,S2MS,24,SD,What is the speed of the bicycle at 1.0s in m/s?,length of the yellow car = 5.44m,,
@@ -47,7 +47,7 @@ id,video_id,video_source,video_type,fps,inference_type,question,ground_truth_pri
 46,simulation_0071,simulation,S2MS,24,SD,What is the speed of the walking pedestrian at 1.0s in m/s?,length of the yellow car = 5.44m,,
 47,simulation_0072,simulation,V2MS,24,DD,What is the speed of the walking pedestrian at 1.0s in m/s?,speed of the bicycle = 5.33m/s,,
 48,simulation_0073,simulation,V2MS,24,DS,What is the width of the white car in meters?,speed of the bicycle = 5.33m/s,,
-49,simulation_0073,simulation,V2MS,24,DS,What is the length of the white car in meters？,speed of the bicycle = 5.33m/s,,
+49,simulation_0073,simulation,V2MS,24,DS,What is the length of the white car in meters?,speed of the bicycle = 5.33m/s,,
 50,simulation_0073,simulation,V2MS,24,DS,What is the distance between the white car and the bicycle at 1.0s in meters?,speed of the bicycle = 5.33m/s,,
 51,simulation_0073,simulation,V2MS,24,DS,What is the  distance between the white car and the bicycle at 2.0s in meters?,speed of the bicycle = 5.33m/s,,
 52,simulation_0073,simulation,V2MS,24,DD,What is the acceleration of the white car at 1.0s in m/s^2?,speed of the bicycle = 5.33m/s,,
@@ -91,14 +91,14 @@ id,video_id,video_source,video_type,fps,inference_type,question,ground_truth_pri
 90,simulation_0082,simulation,S2MX,24,SS,What is the width of the black and white car in meters?,length of the yellow car = 5.67m,,
 91,simulation_0082,simulation,S2MX,24,SS,What is the distance between the yellow car and the black and white car at 1.0s in meters?,length of the yellow car = 5.67m,,
 92,simulation_0082,simulation,S2MX,24,SS,What is the distance between the yellow car and the black and white car at 2.0s in meters?,length of the yellow car = 5.67m,,
-93,simulation_0082,simulation,S2MX,24,SD,What is the speed of the yellow car at 1.0s in m/s？,length of the yellow car = 5.67m,,
+93,simulation_0082,simulation,S2MX,24,SD,What is the speed of the yellow car at 1.0s in m/s?,length of the yellow car = 5.67m,,
 94,simulation_0082,simulation,S2MX,24,SD,What is the speed of the black and white car at 1.0s in m/s?,length of the yellow car = 5.67m,,
 95,simulation_0083,simulation,S2MX,24,SS,What is the width of the yellow car in meters?,length of the yellow car = 5.67m,,
 96,simulation_0083,simulation,S2MX,24,SS,What is the length of the black and white car in meters?,length of the yellow car = 5.67m,,
 97,simulation_0083,simulation,S2MX,24,SS,What is the width of the black and white car in meters?,length of the yellow car = 5.67m,,
 98,simulation_0083,simulation,S2MX,24,SS,What is the distance between the yellow car and the black and white car at 1.0s in meters?,length of the yellow car = 5.67m,,
 99,simulation_0083,simulation,S2MX,24,SS,What is the distance between the yellow car and the black and white car at 2.0s in meters?,length of the yellow car = 5.67m,,
-100,simulation_0083,simulation,S2MX,24,SD,What is the speed of the yellow car at 1.0s in m/s？,length of the yellow car = 5.67m,,
+100,simulation_0083,simulation,S2MX,24,SD,What is the speed of the yellow car at 1.0s in m/s?,length of the yellow car = 5.67m,,
 101,simulation_0083,simulation,S2MX,24,SD,What is the speed of the black and white car at 1.0s in m/s?,length of the yellow car = 5.67m,,
 102,simulation_0084,simulation,V2MX,24,DS,What is the length of the yellow car in meters?,speed of the yellow car = 5.07m/s,,
 103,simulation_0084,simulation,V2MX,24,DS,What is the width of the yellow car in meters?,speed of the yellow car = 5.07m/s,,
@@ -815,16 +815,16 @@ id,video_id,video_source,video_type,fps,inference_type,question,ground_truth_pri
 814,simulation_0241,simulation,V2MC,24,DS,What is the length of the white horse in meters?,speed of the horse at the back = 0.874m/s,,
 815,simulation_0241,simulation,V2MC,24,DS,What is the length of the rabbit in meters?,speed of the horse at the back = 0.874m/s,,
 816,simulation_0241,simulation,V2MC,24,DD,What is the speed of the rabbit at 1s in m/s?,speed of the horse at the back = 0.874m/s,,
-817,simulation_0243,simulation,V2MC,30,DS,What is the height of the antelope in meters？,speed of the antelope = 1.277m/s,,
+817,simulation_0243,simulation,V2MC,30,DS,What is the height of the antelope in meters?,speed of the antelope = 1.277m/s,,
 818,simulation_0243,simulation,V2MC,30,DS,What is the length of the antelope in meters?,speed of the antelope = 1.277m/s,,
 819,simulation_0243,simulation,V2MC,30,DS,What is the height of the tree on the left in meters?,speed of the antelope = 1.277m/s,,
-820,simulation_0244,simulation,V2MC,30,DS,What is the height of the antelope in meters？,speed of the antelope = 1.277m/s,,
+820,simulation_0244,simulation,V2MC,30,DS,What is the height of the antelope in meters?,speed of the antelope = 1.277m/s,,
 821,simulation_0244,simulation,V2MC,30,DS,What is the length of the antelope in meters?,speed of the antelope = 1.277m/s,,
 822,simulation_0244,simulation,V2MC,30,DS,What is the height of the tree on the left in meters?,speed of the antelope = 1.277m/s,,
 823,simulation_0244,simulation,V2MC,30,DD,What is the speed of the rabbit in m/s?,speed of the antelope = 1.277m/s,,
 824,simulation_0244,simulation,V2MC,30,DS,What is the height of the rabbit in meters?,speed of the antelope = 1.277m/s,,
 825,simulation_0244,simulation,V2MC,30,DS,What is the length of the rabbit in meters?,speed of the antelope = 1.277m/s,,
-826,simulation_0245,simulation,V2MS,30,DS,What is the height of the antelope in meters？,speed of the antelope = 1.277m/s,,
+826,simulation_0245,simulation,V2MS,30,DS,What is the height of the antelope in meters?,speed of the antelope = 1.277m/s,,
 827,simulation_0245,simulation,V2MS,30,DS,What is the length of the antelope in meters?,speed of the antelope = 1.277m/s,,
 828,simulation_0245,simulation,V2MS,30,DD,What is the speed of the rabbit at 1s in m/s?,speed of the antelope = 1.277m/s,,
 829,simulation_0245,simulation,V2MS,30,DS,What is the height of the rabbit in meters?,speed of the antelope = 1.277m/s,,
@@ -1454,7 +1454,7 @@ t=1s, distance_human_camera = 139.9543 m
 t=2s, distance_human_camera = 139.9833 m
 t=1s, distance_eagle_camera = 139.7566 m
 t=2s, distance_eagle_camera = 130.2468m",
-1131,simulation_0033,simulation,A3MC,30,DD,What is the walking speed of the person at 1.0s in meters?,acceleration of the orange car = -2.86m/s^2,"t=0s, distance_human_camera = 13.780m
+1131,simulation_0033,simulation,A3MC,30,DD,What is the walking speed of the person at 1.0s in m/s?,acceleration of the orange car = -2.86m/s^2,"t=0s, distance_human_camera = 13.780m
 t=1s, distance_human_camera = 13.651m
 t=0s, distance_orange_car_camera = 12.048m
 t=1s, distance_orange_car_camera = 10.432m
@@ -1909,7 +1909,7 @@ t=0s, distance_human_camera = 8.313m
 t=1s, distance_human_camera = 8.189m
 distance_fire_hydrant_camera = 9.207m
 distance_streetlight_camera = 8.901m",
-1225,simulation_0055,simulation,A3MC,30,DD,What is the average walking speed of the person from 1.0s to 2.0s in meters?,acceleration of the orange car = -2.86m/s^2,"t=0s, distance_orange_car_camera = 16.059m
+1225,simulation_0055,simulation,A3MC,30,DD,What is the average walking speed of the person from 1.0s to 2.0s in m/s?,acceleration of the orange car = -2.86m/s^2,"t=0s, distance_orange_car_camera = 16.059m
 t=1s, distance_orange_car_camera = 11.671m
 t=0s, distance_human_camera = 8.313m
 t=1s, distance_human_camera = 8.189m
@@ -1975,7 +1975,7 @@ t=1s, distance_human_camera = 5.159m
 distance_fire_hydrant_camera = 4.721m
 distance_near_streetlight_camera = 5.201m
 distance_far_streetlight_camera =13.174m",
-1233,simulation_0058,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 18.7297m
+1233,simulation_0058,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 18.7297m
 t=1.58s, distance_human_camera = 17.6974m
 t=0.58s, distance_yellow_car_camera = 25.7041m
 t=1.58s, distance_yellow_car_camera = 22.2916m
@@ -1991,7 +1991,7 @@ t=0.58s, distance_white_car_camera = 31.0700m
 t=1.58s, distance_white_car_camera = 29.9182m
 t=0.58s, distance_bike_camera = 27.8122m
 t=1.58s, distance_bike_camera = 27.1221m",
-1235,simulation_0058,simulation,A3MC,24,DS,What is the length of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 18.7297m
+1235,simulation_0058,simulation,A3MC,24,DS,What is the length of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 18.7297m
 t=1.58s, distance_human_camera = 17.6974m
 t=0.58s, distance_yellow_car_camera = 25.7041m
 t=1.58s, distance_yellow_car_camera = 22.2916m
@@ -2071,7 +2071,7 @@ t=0.58s, distance_white_car_camera = 31.0700m
 t=1.58s, distance_white_car_camera = 29.9182m
 t=0.58s, distance_bike_camera = 27.8122m
 t=1.58s, distance_bike_camera = 27.1221m",
-1245,simulation_0059,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 30.9678m
+1245,simulation_0059,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 30.9678m
 t=1.58s, distance_human_camera = 29.8174m
 t=0.58s, distance_yellow_car_camera = 38.5961m
 t=1.58s, distance_yellow_car_camera = 35.3917m
@@ -2087,7 +2087,7 @@ t=0.58s, distance_white_car_camera = 43.8120m
 t=1.58s, distance_white_car_camera = 43.0028m
 t=0.58s, distance_bike_camera = 40.8706m
 t=1.58s, distance_bike_camera = 40.4042m",
-1247,simulation_0059,simulation,A3MC,24,DS,What is the length of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 30.9678m
+1247,simulation_0059,simulation,A3MC,24,DS,What is the length of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 30.9678m
 t=1.58s, distance_human_camera = 29.8174m
 t=0.58s, distance_yellow_car_camera = 38.5961m
 t=1.58s, distance_yellow_car_camera = 35.3917m
@@ -2175,7 +2175,7 @@ t=0.58s, distance_white_car_camera = 43.8120m
 t=1.58s, distance_white_car_camera = 43.0028m
 t=0.58s, distance_bike_camera = 40.8706m
 t=1.58s, distance_bike_camera = 40.4042m",
-1258,simulation_0060,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 34.4785m
+1258,simulation_0060,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 34.4785m
 t=1.58s, distance_human_camera = 35.6486m
 t=0.58s, distance_yellow_car_camera = 26.2275m
 t=1.58s, distance_yellow_car_camera = 28.4240m
@@ -2191,7 +2191,7 @@ t=0.58s, distance_white_car_camera = 22.7254m
 t=1.58s, distance_white_car_camera = 21.5370m
 t=0.58s, distance_bike_camera = 23.5534m
 t=1.58s, distance_bike_camera = 23.2262m",
-1260,simulation_0060,simulation,A3MC,24,DS,What is the length of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 34.4785m
+1260,simulation_0060,simulation,A3MC,24,DS,What is the length of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 34.4785m
 t=1.58s, distance_human_camera = 35.6486m
 t=0.58s, distance_yellow_car_camera = 26.2275m
 t=1.58s, distance_yellow_car_camera = 28.4240m
@@ -2263,7 +2263,7 @@ t=0.58s, distance_white_car_camera = 22.7254m
 t=1.58s, distance_white_car_camera = 21.5370m
 t=0.58s, distance_bike_camera = 23.5534m
 t=1.58s, distance_bike_camera = 23.2262m",
-1269,simulation_0061,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 33.4337m
+1269,simulation_0061,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 33.4337m
 t=1.58s, distance_human_camera = 32.4161m
 t=0.58s, distance_yellow_car_camera = 40.1000m
 t=1.58s, distance_yellow_car_camera = 36.4347m
@@ -2279,7 +2279,7 @@ t=0.58s, distance_white_car_camera = 45.5234m
 t=1.58s, distance_white_car_camera = 43.9499m
 t=0.58s, distance_bike_camera = 41.9010m
 t=1.58s, distance_bike_camera = 40.3415m",
-1271,simulation_0061,simulation,A3MC,24,DS,What is the length of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 33.4337m
+1271,simulation_0061,simulation,A3MC,24,DS,What is the length of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 33.4337m
 t=1.58s, distance_human_camera = 32.4161m
 t=0.58s, distance_yellow_car_camera = 40.1000m
 t=1.58s, distance_yellow_car_camera = 36.4347m
@@ -2351,7 +2351,7 @@ t=0.58s, distance_white_car_camera = 45.5234m
 t=1.58s, distance_white_car_camera = 43.9499m
 t=0.58s, distance_bike_camera = 41.9010m
 t=1.58s, distance_bike_camera = 40.3415m",
-1280,simulation_0062,simulation,A3MC,24,DD,What is the average speed of the yellow car at 2.5s in m/s？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 17.2804m
+1280,simulation_0062,simulation,A3MC,24,DD,What is the average speed of the yellow car at 2.5s in m/s?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 17.2804m
 t=1.58s, distance_human_camera = 16.1558m
 t=0.58s, distance_yellow_car_camera = 24.8550m
 t=1.58s, distance_yellow_car_camera = 21.7231m
@@ -2367,7 +2367,7 @@ t=0.58s, distance_white_car_camera = 30.0650m
 t=1.58s, distance_white_car_camera = 29.3069m
 t=0.58s, distance_bike_camera = 27.1687m
 t=1.58s, distance_bike_camera = 27.0656m",
-1282,simulation_0062,simulation,A3MC,24,DS,What is the height of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 17.2804m
+1282,simulation_0062,simulation,A3MC,24,DS,What is the height of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 17.2804m
 t=1.58s, distance_human_camera = 16.1558m
 t=0.58s, distance_yellow_car_camera = 24.8550m
 t=1.58s, distance_yellow_car_camera = 21.7231m
@@ -2375,7 +2375,7 @@ t=0.58s, distance_white_car_camera = 30.0650m
 t=1.58s, distance_white_car_camera = 29.3069m
 t=0.58s, distance_bike_camera = 27.1687m
 t=1.58s, distance_bike_camera = 27.0656m",
-1283,simulation_0062,simulation,A3MC,24,DS,What is the length of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 17.2804m
+1283,simulation_0062,simulation,A3MC,24,DS,What is the length of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 17.2804m
 t=1.58s, distance_human_camera = 16.1558m
 t=0.58s, distance_yellow_car_camera = 24.8550m
 t=1.58s, distance_yellow_car_camera = 21.7231m
@@ -2455,7 +2455,7 @@ t=0.58s, distance_white_car_camera = 30.0650m
 t=1.58s, distance_white_car_camera = 29.3069m
 t=0.58s, distance_bike_camera = 27.1687m
 t=1.58s, distance_bike_camera = 27.0656m",
-1293,simulation_0063,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 16.6692m
+1293,simulation_0063,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 16.6692m
 t=1.58s, distance_human_camera = 15.5003m
 t=0.58s, distance_yellow_car_camera = 24.8414m
 t=1.58s, distance_yellow_car_camera = 22.9530m
@@ -2471,7 +2471,7 @@ t=0.58s, distance_white_car_camera = 29.2444m
 t=1.58s, distance_white_car_camera = 29.8093m
 t=0.58s, distance_bike_camera = 27.7544m
 t=1.58s, distance_bike_camera = 29.4124m",
-1295,simulation_0063,simulation,A3MC,24,DS,What is the height of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 16.6692m
+1295,simulation_0063,simulation,A3MC,24,DS,What is the height of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 16.6692m
 t=1.58s, distance_human_camera = 15.5003m
 t=0.58s, distance_yellow_car_camera = 24.8414m
 t=1.58s, distance_yellow_car_camera = 22.9530m
@@ -2479,7 +2479,7 @@ t=0.58s, distance_white_car_camera = 29.2444m
 t=1.58s, distance_white_car_camera = 29.8093m
 t=0.58s, distance_bike_camera = 27.7544m
 t=1.58s, distance_bike_camera = 29.4124m",
-1296,simulation_0063,simulation,A3MC,24,DS,What is the length of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 16.6692m
+1296,simulation_0063,simulation,A3MC,24,DS,What is the length of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 16.6692m
 t=1.58s, distance_human_camera = 15.5003m
 t=0.58s, distance_yellow_car_camera = 24.8414m
 t=1.58s, distance_yellow_car_camera = 22.9530m
@@ -2559,7 +2559,7 @@ t=0.58s, distance_white_car_camera = 29.2444m
 t=1.58s, distance_white_car_camera = 29.8093m
 t=0.58s, distance_bike_camera = 27.7544m
 t=1.58s, distance_bike_camera = 29.4124m",
-1306,simulation_0064,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 38.3473m
+1306,simulation_0064,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 38.3473m
 t=1.58s, distance_human_camera = 38.7220m
 t=0.58s, distance_yellow_car_camera = 35.5258m
 t=1.58s, distance_yellow_car_camera = 33.0077m
@@ -2575,7 +2575,7 @@ t=0.58s, distance_white_car_camera = 38.1362m
 t=1.58s, distance_white_car_camera = 34.0492m
 t=0.58s, distance_bike_camera = 33.9976m
 t=1.58s, distance_bike_camera = 28.6807m",
-1308,simulation_0064,simulation,A3MC,24,DS,What is the height of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 38.3473m
+1308,simulation_0064,simulation,A3MC,24,DS,What is the height of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 38.3473m
 t=1.58s, distance_human_camera = 38.7220m
 t=0.58s, distance_yellow_car_camera = 35.5258m
 t=1.58s, distance_yellow_car_camera = 33.0077m
@@ -2583,7 +2583,7 @@ t=0.58s, distance_white_car_camera = 38.1362m
 t=1.58s, distance_white_car_camera = 34.0492m
 t=0.58s, distance_bike_camera = 33.9976m
 t=1.58s, distance_bike_camera = 28.6807m",
-1309,simulation_0064,simulation,A3MC,24,DS,What is the width of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 38.3473m
+1309,simulation_0064,simulation,A3MC,24,DS,What is the width of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 38.3473m
 t=1.58s, distance_human_camera = 38.7220m
 t=0.58s, distance_yellow_car_camera = 35.5258m
 t=1.58s, distance_yellow_car_camera = 33.0077m
@@ -2655,7 +2655,7 @@ t=0.58s, distance_white_car_camera = 38.1362m
 t=1.58s, distance_white_car_camera = 34.0492m
 t=0.58s, distance_bike_camera = 33.9976m
 t=1.58s, distance_bike_camera = 28.6807m",
-1318,simulation_0065,simulation,A3MC,24,DD,What is the average speed of the yellow car from the beginning to the end in m/s？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 25.3568m
+1318,simulation_0065,simulation,A3MC,24,DD,What is the average speed of the yellow car from the beginning to the end in m/s?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 25.3568m
 t=1.58s, distance_human_camera = 25.9200m
 t=0.58s, distance_yellow_car_camera = 23.7441m
 t=1.58s, distance_yellow_car_camera = 27.0055m
@@ -2671,7 +2671,7 @@ t=0.58s, distance_white_car_camera = 21.3649m
 t=1.58s, distance_white_car_camera = 25.2551m
 t=0.58s, distance_bike_camera = 25.3360m
 t=1.58s, distance_bike_camera = 30.4344m",
-1320,simulation_0065,simulation,A3MC,24,DS,What is the height of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 25.3568m
+1320,simulation_0065,simulation,A3MC,24,DS,What is the height of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 25.3568m
 t=1.58s, distance_human_camera = 25.9200m
 t=0.58s, distance_yellow_car_camera = 23.7441m
 t=1.58s, distance_yellow_car_camera = 27.0055m
@@ -2679,7 +2679,7 @@ t=0.58s, distance_white_car_camera = 21.3649m
 t=1.58s, distance_white_car_camera = 25.2551m
 t=0.58s, distance_bike_camera = 25.3360m
 t=1.58s, distance_bike_camera = 30.4344m",
-1321,simulation_0065,simulation,A3MC,24,DS,What is the width of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 25.3568m
+1321,simulation_0065,simulation,A3MC,24,DS,What is the width of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 25.3568m
 t=1.58s, distance_human_camera = 25.9200m
 t=0.58s, distance_yellow_car_camera = 23.7441m
 t=1.58s, distance_yellow_car_camera = 27.0055m
@@ -2751,7 +2751,7 @@ t=0.58s, distance_white_car_camera = 21.3649m
 t=1.58s, distance_white_car_camera = 25.2551m
 t=0.58s, distance_bike_camera = 25.3360m
 t=1.58s, distance_bike_camera = 30.4344m",
-1330,simulation_0066,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.0610m
+1330,simulation_0066,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.0610m
 t=1.58s, distance_human_camera = 21.3488m
 t=0.58s, distance_yellow_car_camera = 19.6514m
 t=1.58s, distance_yellow_car_camera = 16.5490m
@@ -2775,7 +2775,7 @@ t=0.58s, distance_white_car_camera = 23.5892m
 t=1.58s, distance_white_car_camera = 19.9903m
 t=0.58s, distance_bike_camera = 19.0650m
 t=1.58s, distance_bike_camera = 14.6515m",
-1333,simulation_0066,simulation,A3MC,24,DS,What is the length of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.0610m
+1333,simulation_0066,simulation,A3MC,24,DS,What is the length of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.0610m
 t=1.58s, distance_human_camera = 21.3488m
 t=0.58s, distance_yellow_car_camera = 19.6514m
 t=1.58s, distance_yellow_car_camera = 16.5490m
@@ -2783,7 +2783,7 @@ t=0.58s, distance_white_car_camera = 23.5892m
 t=1.58s, distance_white_car_camera = 19.9903m
 t=0.58s, distance_bike_camera = 19.0650m
 t=1.58s, distance_bike_camera = 14.6515m",
-1334,simulation_0066,simulation,A3MC,24,DS,What is the height of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.0610m
+1334,simulation_0066,simulation,A3MC,24,DS,What is the height of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.0610m
 t=1.58s, distance_human_camera = 21.3488m
 t=0.58s, distance_yellow_car_camera = 19.6514m
 t=1.58s, distance_yellow_car_camera = 16.5490m
@@ -2887,7 +2887,7 @@ t=0.58s, distance_white_car_camera = 23.5892m
 t=1.58s, distance_white_car_camera = 19.9903m
 t=0.58s, distance_bike_camera = 19.0650m
 t=1.58s, distance_bike_camera = 14.6515m",
-1347,simulation_0067,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.6770m
+1347,simulation_0067,simulation,A3MC,24,DD,What is the speed of the yellow car at 2.5s in m/s?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.6770m
 t=1.58s, distance_human_camera = 22.7825m
 t=0.58s, distance_yellow_car_camera = 14.7874m
 t=1.58s, distance_yellow_car_camera = 18.3786m
@@ -2911,7 +2911,7 @@ t=0.58s, distance_white_car_camera = 10.6240m
 t=1.58s, distance_white_car_camera = 12.8097m
 t=0.58s, distance_bike_camera = 14.1413m
 t=1.58s, distance_bike_camera = 17.8223m",
-1350,simulation_0067,simulation,A3MC,24,DS,What is the length of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.6770m
+1350,simulation_0067,simulation,A3MC,24,DS,What is the length of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.6770m
 t=1.58s, distance_human_camera = 22.7825m
 t=0.58s, distance_yellow_car_camera = 14.7874m
 t=1.58s, distance_yellow_car_camera = 18.3786m
@@ -2919,7 +2919,7 @@ t=0.58s, distance_white_car_camera = 10.6240m
 t=1.58s, distance_white_car_camera = 12.8097m
 t=0.58s, distance_bike_camera = 14.1413m
 t=1.58s, distance_bike_camera = 17.8223m",
-1351,simulation_0067,simulation,A3MC,24,DS,What is the height of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.6770m
+1351,simulation_0067,simulation,A3MC,24,DS,What is the height of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.6770m
 t=1.58s, distance_human_camera = 22.7825m
 t=0.58s, distance_yellow_car_camera = 14.7874m
 t=1.58s, distance_yellow_car_camera = 18.3786m
@@ -3119,7 +3119,7 @@ t=0.58s, distance_white_car_camera = 31.2826m
 t=1.58s, distance_white_car_camera = 27.7202m
 t=0.58s, distance_bike_camera = 28.6001m
 t=1.58s, distance_bike_camera = 24.5118m",
-1376,simulation_0074,simulation,S3MS,24,SD,What is the height of the white car in meters？,length of the white car = 6m,"t=0.58s, distance_human_camera = 37.0747m
+1376,simulation_0074,simulation,S3MS,24,SD,What is the height of the white car in meters?,length of the white car = 6m,"t=0.58s, distance_human_camera = 37.0747m
 t=1.58s, distance_human_camera = 37.8958m
 t=0.58s, distance_yellow_car_camera = 31.0495m
 t=1.58s, distance_yellow_car_camera = 30.4267m
@@ -3129,13 +3129,13 @@ t=0.58s, distance_bike_camera = 28.6001m
 t=1.58s, distance_bike_camera = 24.5118m",
 1377,simulation_0109,simulation,V3MX,24,DS,What is the distance between two cells at 1s in meters?,speed of the red blood cell = 4.7833 m/s,"t=1.0s, distance_left_red_blood_cell_camera = 22.0155 m
 t=2.0s, distance_left_red_blood_cell_camera = 24.0333 m",
-1378,simulation_0109,simulation,V3MX,24,DS,What is the diameter of the red blood cell in meters？,speed of the red blood cell = 4.7833 m/s,"t=1.0s, distance_left_red_blood_cell_camera = 22.0155 m
+1378,simulation_0109,simulation,V3MX,24,DS,What is the diameter of the red blood cell in meters?,speed of the red blood cell = 4.7833 m/s,"t=1.0s, distance_left_red_blood_cell_camera = 22.0155 m
 t=2.0s, distance_left_red_blood_cell_camera = 24.0333 m",
 1379,simulation_0110,simulation,V3MX,24,DS,What is the distance between two cells at 1s in meters?,speed of the red blood cell = 4.7833 m/s,"t=1.0s, distance_left_red_blood_cell_camera = 17.9557 m
 t=2.0s, distance_left_red_blood_cell_camera = 22.7150 m",
-1380,simulation_0110,simulation,V3MX,24,DS,What is the thickness of the red blood cell in meters？,speed of the red blood cell = 4.7833 m/s,"t=1.0s, distance_left_red_blood_cell_and_camera = 17.9557 m
+1380,simulation_0110,simulation,V3MX,24,DS,What is the thickness of the red blood cell in meters?,speed of the red blood cell = 4.7833 m/s,"t=1.0s, distance_left_red_blood_cell_and_camera = 17.9557 m
 t=2.0s, distance_left_red_blood_cell_and_camera = 22.7150 m",
-1381,simulation_0110,simulation,V3MX,24,DS,What is the diameter of the red blood cell in meters？,speed of the red blood cell = 4.7833 m/s,"t=1.0s, distance_left_red_blood_cell_and_camera = 17.9557 m
+1381,simulation_0110,simulation,V3MX,24,DS,What is the diameter of the red blood cell in meters?,speed of the red blood cell = 4.7833 m/s,"t=1.0s, distance_left_red_blood_cell_and_camera = 17.9557 m
 t=2.0s, distance_left_red_blood_cell_and_camera = 22.7150 m",
 1382,simulation_0143,simulation,S3MC,24,SS,What is the side length of the floor tile in meters?,height of the man = 1.8m,"t=0s, distance_man_camera = 7.21m   
 t=0.5s, distance_man_camera = 7.91m",
@@ -3143,7 +3143,7 @@ t=0.5s, distance_man_camera = 7.91m",
 t=0.5s, distance_man_camera = 7.91m",
 1384,simulation_0143,simulation,S3MC,24,SD,What is the speed of the man at time 2s in m/s?,height of the man = 1.8m,"t=0s, distance_man_camera = 7.21m   
 t=0.5s, distance_man_camera = 7.91m",
-1385,simulation_0143,simulation,S3MC,24,SD,What is the acceleration of the man at time 2.5s in m/s?,height of the man = 1.8m,"t=0s, distance_man_camera = 7.21m   
+1385,simulation_0143,simulation,S3MC,24,SD,What is the acceleration of the man at time 2.5s in m/s^2?,height of the man = 1.8m,"t=0s, distance_man_camera = 7.21m   
 t=0.5s, distance_man_camera = 7.91m",
 1386,simulation_0164,simulation,S3MC,24,SD,What is the speed of the ball at time 0.5s in m/s?,diameter of the ball = 0.21m,t=0.5s distance_bowling_ball_camera = 9.391m,
 1387,simulation_0164,simulation,S3MC,24,SD,What is the acceleration of the ball at time 0.5s in m/s^2?,diameter of the ball = 0.21m,t=0.5s distance_bowling_ball_camera = 9.391m,
@@ -3400,7 +3400,7 @@ distance_neonsign_camera = 34.5m",
 1504,simulation_0140,simulation,S3MC,24,SS,What is the height of the letter neon sign in meters?,width of each window frame = 1.48m,"t=0s, distance_bird_camera = 25.328m
 t=0.5s, distance_bird_camera = 24.899m
 distance_neonsign_camera = 34.5m",
-1505,simulation_0140,simulation,S3MC,24,SS,What is the distance between the bird’s flight path and the wall with the neon sign?,width of each window frame = 1.48m,"t=0s, distance_bird_camera = 25.328m
+1505,simulation_0140,simulation,S3MC,24,SS,What is the distance between the bird’s flight path and the wall with the neon sign in meters?,width of each window frame = 1.48m,"t=0s, distance_bird_camera = 25.328m
 t=0.5s, distance_bird_camera = 24.899m
 distance_neonsign_camera = 34.5m",
 1506,simulation_0140,simulation,S3MC,24,SS,What is the total length of the bird’s flight path in meters?,width of each window frame = 1.48m,"t=0s, distance_bird_camera = 25.328m
@@ -3437,7 +3437,7 @@ t=0.5s, distance_rocket_camera = 41.127m",
 1522,simulation_0149,simulation,S3MC,24,SD,What is the speed of the car at time 0.5s in m/s?,diameter of the tire = 0.764m,"t=0s, distance_yellowCarRightFrontTire_camera = 14.244m",
 1523,simulation_0149,simulation,S3MC,24,SD,What is the acceleration of the car at time 0.5s in m/s^2?,diameter of the tire = 0.764m,"t=0s, distance_yellowCarRightFrontTire_camera = 14.244m",
 1524,simulation_0149,simulation,S3MC,24,SD,What is the speed of the car at time 1s in m/s?,diameter of the tire = 0.764m,"t=0s, distance_yellowCarRightFrontTire_camera = 14.244m",
-1525,simulation_0149,simulation,S3MC,24,SD,What is the acceleration of the car at time 1s in m/s?,diameter of the tire = 0.764m,"t=0s, distance_yellowCarRightFrontTire_camera = 14.244m",
+1525,simulation_0149,simulation,S3MC,24,SD,What is the acceleration of the car at time 1s in m/s^2?,diameter of the tire = 0.764m,"t=0s, distance_yellowCarRightFrontTire_camera = 14.244m",
 1526,simulation_0150,simulation,S3MC,24,SS,What is the width of the car in meters?,diameter of the tire = 0.764m,"t=0.5s, distance_yellowCarLeftFrontTire_camera = 11.38m,
 distance_camera_B1sign = 23.44m",
 1527,simulation_0150,simulation,S3MC,24,SS,"What is the height, in meters, of the black-and-white collision warning markings on the pillar?",diameter of the tire = 0.764m,"t=0.5s, distance_yellowCarLeftFrontTire_camera = 11.38m,
@@ -3873,7 +3873,7 @@ t=1.0s, distance_rabbit_camera=15.852m",
 t=1.0s, distance_rabbit_camera=15.852m",
 1630,simulation_0247,simulation,V2MS,30,DD,What is the average speed of the rabbit in m/s?,speed of the deer = 1.277m/s,"t=0s, distance_rabbit_camera=15.798m  
 t=1.0s, distance_rabbit_camera=15.852m",
-1631,simulation_0312,simulation,S3SX,24,SD,What is the average speed of the star from the beginning to the end in meters?,height of the star = 0.2m,"t=1.0s, distance_star_camera = 6.552m
+1631,simulation_0312,simulation,S3SX,24,SD,What is the average speed of the star from the beginning to the end in m/s?,height of the star = 0.2m,"t=1.0s, distance_star_camera = 6.552m
 t=2.0s, distance_star_camera = 8.345m",
 1632,simulation_0312,simulation,S3SX,24,SS,What is the width of the star in meters?,height of the star = 0.2m,"t=1.0s, distance_star_camera = 6.552m
 t=2.0s, distance_star_camera = 8.345m",
@@ -4016,7 +4016,7 @@ t=1s, distance_human_camera = 6.49m
 distance_the_nearest_freestanding_art_display_panel = 11.042m
 distance_the_pedestal_of_the_central_sculpture_and_camera = 5.085m
 distance_the central_sculpture_camera = 5.085m",
-1665,simulation_0021_segmented,segmentation,S3MX,30,SD,What is the average walking speed of the person in meters?,height of the person = 1.87m,"t=0s, distance_human_camera = 13.882m
+1665,simulation_0021_segmented,segmentation,S3MX,30,SD,What is the average walking speed of the person in m/s?,height of the person = 1.87m,"t=0s, distance_human_camera = 13.882m
 t=1s, distance_human_camera = 13.768m
 distance_fire_hydrant_camera = 12.565m
 distance_streetlight_camera = 12.325m",
@@ -4028,7 +4028,7 @@ distance_streetlight_camera = 12.325m",
 t=1s, distance_human_camera = 13.768m
 distance_fire_hydrant_camera = 12.565m
 distance_streetlight_camera = 12.325m",
-1668,simulation_0022_segmented,segmentation,S3MX,24,SD,What is the average walking speed of the person in meters?,length of the boat = 10m,"t=1s, distance_boat_camera = 148.7451 m
+1668,simulation_0022_segmented,segmentation,S3MX,24,SD,What is the average walking speed of the person in m/s?,length of the boat = 10m,"t=1s, distance_boat_camera = 148.7451 m
 t=2s, distance_boat_camera = 146.9726 m",
 1669,simulation_0022_segmented,segmentation,S3MX,24,SS,What is the height of the boat in meters?,length of the boat = 10m,"t=1s, distance_boat_camera = 148.7451 m
 t=2s, distance_boat_camera = 146.9726 m",
@@ -4376,7 +4376,7 @@ t=2s, distance_human_camera = 10.8165m",
 1759,simulation_0057_segmented,segmentation,A2MX,30,DS,What is the length of the orange car in meters?,acceleration of the orange car = -2.86m/s^2,,
 1760,simulation_0057_segmented,segmentation,A2MX,30,DS,What is the distance between the two streetlights in meters?,acceleration of the orange car = -2.86m/s^2,,
 1761,simulation_0057_segmented,segmentation,A2MX,30,DS,What is the width of the orange car in meters?,acceleration of the orange car = -2.86m/s^2,,
-1762,simulation_0066_segmented,segmentation,A3MX,24,DD,What is the average speed of the yellow car in m/s？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.0610m
+1762,simulation_0066_segmented,segmentation,A3MX,24,DD,What is the average speed of the yellow car in m/s?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.0610m
 t=1.58s, distance_human_camera = 21.3488m
 t=0.58s, distance_yellow_car_camera = 19.6514m
 t=1.58s, distance_yellow_car_camera = 16.5490m
@@ -4400,7 +4400,7 @@ t=0.58s, distance_white_car_camera = 23.5892m
 t=1.58s, distance_white_car_camera = 19.9903m
 t=0.58s, distance_bike_camera = 19.0650m
 t=1.58s, distance_bike_camera = 14.6515m",
-1765,simulation_0066_segmented,segmentation,A3MX,24,DS,What is the length of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.0610m
+1765,simulation_0066_segmented,segmentation,A3MX,24,DS,What is the length of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.0610m
 t=1.58s, distance_human_camera = 21.3488m
 t=0.58s, distance_yellow_car_camera = 19.6514m
 t=1.58s, distance_yellow_car_camera = 16.5490m
@@ -4408,7 +4408,7 @@ t=0.58s, distance_white_car_camera = 23.5892m
 t=1.58s, distance_white_car_camera = 19.9903m
 t=0.58s, distance_bike_camera = 19.0650m
 t=1.58s, distance_bike_camera = 14.6515m",
-1766,simulation_0066_segmented,segmentation,A3MX,24,DS,What is the height of the white car in meters？,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.0610m
+1766,simulation_0066_segmented,segmentation,A3MX,24,DS,What is the height of the white car in meters?,acceleration of the white car = 4m/s^2,"t=0.58s, distance_human_camera = 21.0610m
 t=1.58s, distance_human_camera = 21.3488m
 t=0.58s, distance_yellow_car_camera = 19.6514m
 t=1.58s, distance_yellow_car_camera = 16.5490m
@@ -4512,11 +4512,11 @@ t=0.58s, distance_white_car_camera = 23.5892m
 t=1.58s, distance_white_car_camera = 19.9903m
 t=0.58s, distance_bike_camera = 19.0650m
 t=1.58s, distance_bike_camera = 14.6515m",
-1779,simulation_0068_segmented,segmentation,A2MX,24,DD,What is the average speed of the yellow car in m/s？,acceleration of the white car = 4m/s^2,,
+1779,simulation_0068_segmented,segmentation,A2MX,24,DD,What is the average speed of the yellow car in m/s?,acceleration of the white car = 4m/s^2,,
 1780,simulation_0068_segmented,segmentation,A2MX,24,DS,What is the length of the turning yellow car in meters?,acceleration of the white car = 4m/s^2,,
 1781,simulation_0068_segmented,segmentation,A2MX,24,DS,What is the width of the turning yellow car in meters?,acceleration of the white car = 4m/s^2,,
 1782,simulation_0068_segmented,segmentation,A2MX,24,DS,What is the width of the white car in meters?,acceleration of the white car = 4m/s^2,,
-1783,simulation_0068_segmented,segmentation,A2MX,24,DS,What is the length of the white car in meters？,acceleration of the white car = 4m/s^2,,
+1783,simulation_0068_segmented,segmentation,A2MX,24,DS,What is the length of the white car in meters?,acceleration of the white car = 4m/s^2,,
 1784,simulation_0098_segmented,segmentation,V2MX,24,DD,What is the average speed of the boat in m/s?,speed of the shark = 3m/s,,
 1785,simulation_0098_segmented,segmentation,V2MX,24,DS,What is the length of the boat in meters?,speed of the shark = 3m/s,,
 1786,simulation_0098_segmented,segmentation,V2MX,24,DS,What is the length of the shark in meters?,speed of the shark = 3m/s,,
@@ -4716,10 +4716,10 @@ t =1s, distance_center_of _the_truck_camera = 19.525m",
 1974,simulation_0239_segmented,segmentation,V2MX,24,DS,What is the length of the house in meters?,speed of the brown horse = 0.874m/s,,
 1975,simulation_0239_segmented,segmentation,V2MX,24,DD,What is the average speed of the white horse in m/s?,speed of the brown horse = 0.874m/s,,
 1976,simulation_0239_segmented,segmentation,V2MX,24,DS,What is the length of the white horse in meters?,speed of the brown horse = 0.874m/s,,
-1977,simulation_0243_segmented,segmentation,V2MX,30,DS,What is the height of the deer in meters？,speed of the deer = 1.277m/s,,
+1977,simulation_0243_segmented,segmentation,V2MX,30,DS,What is the height of the deer in meters?,speed of the deer = 1.277m/s,,
 1978,simulation_0243_segmented,segmentation,V2MX,30,DS,What is the length of the deer in meters?,speed of the deer = 1.277m/s,,
 1979,simulation_0243_segmented,segmentation,V2MX,30,DS,What is the height of the tree behind the deer in meters?,speed of the deer = 1.277m/s,,
-1980,simulation_0245_segmented,segmentation,V2MX,30,DS,What is the height of the deer in meters？,speed of the deer = 1.277m/s,,
+1980,simulation_0245_segmented,segmentation,V2MX,30,DS,What is the height of the deer in meters?,speed of the deer = 1.277m/s,,
 1981,simulation_0245_segmented,segmentation,V2MX,30,DS,What is the length of the deer in meters?,speed of the deer = 1.277m/s,,
 1982,simulation_0245_segmented,segmentation,V2MX,30,DD,What is the average speed of the rabbit in m/s?,speed of the deer = 1.277m/s,,
 1983,simulation_0245_segmented,segmentation,V2MX,30,DS,What is the height of the rabbit in meters?,speed of the deer = 1.277m/s,,
@@ -5104,14 +5104,14 @@ t=1.2s, distance_ball_camera = 1.7840m
 t=1.5s, distance_ball_camera = 1.7170m
 t=1.8s, distance_ball_camera = 1.3500m
 ",
-2195,captured_0010,lab,A3SC,24,DS,What is that ball's acceleration at 0.3s in m/s? ,gravity_acceleration = 9.8 m/s^2,"t=0.3s, distance_ball_camera = 1.7060m
+2195,captured_0010,lab,A3SC,24,DS,What is that ball's acceleration at 0.3s in m/s^2? ,gravity_acceleration = 9.8 m/s^2,"t=0.3s, distance_ball_camera = 1.7060m
 t=0.6s, distance_ball_camera = 1.3440m
 t=0.9s, distance_ball_camera = 1.4605m
 t=1.2s, distance_ball_camera = 1.7840m
 t=1.5s, distance_ball_camera = 1.7170m
 t=1.8s, distance_ball_camera = 1.3500m
 ",
-2196,captured_0010,lab,A3SC,24,DS,What is that ball's acceleration at 0.6s in m/s? ,gravity_acceleration = 9.8 m/s^2,"t=0.3s, distance_ball_camera = 1.7060m
+2196,captured_0010,lab,A3SC,24,DS,What is that ball's acceleration at 0.6s in m/s^2? ,gravity_acceleration = 9.8 m/s^2,"t=0.3s, distance_ball_camera = 1.7060m
 t=0.6s, distance_ball_camera = 1.3440m
 t=0.9s, distance_ball_camera = 1.4605m
 t=1.2s, distance_ball_camera = 1.7840m
@@ -5146,14 +5146,14 @@ t=1.2s, distance_ball_camera = 1.7840m
 t=1.5s, distance_ball_camera = 1.7170m
 t=1.8s, distance_ball_camera = 1.3500m
 ",
-2201,captured_0010s,lab,A3SS,24,DS,What is that ball's acceleration at 0.3s in m/s? ,gravity_acceleration = 9.8 m/s^2,"t=0.3s, distance_ball_camera = 1.7060m
+2201,captured_0010s,lab,A3SS,24,DS,What is that ball's acceleration at 0.3s in m/s^2? ,gravity_acceleration = 9.8 m/s^2,"t=0.3s, distance_ball_camera = 1.7060m
 t=0.6s, distance_ball_camera = 1.3440m
 t=0.9s, distance_ball_camera = 1.4605m
 t=1.2s, distance_ball_camera = 1.7840m
 t=1.5s, distance_ball_camera = 1.7170m
 t=1.8s, distance_ball_camera = 1.3500m
 ",
-2202,captured_0010s,lab,A3SS,24,DS,What is that ball's acceleration at 0.6s in m/s? ,gravity_acceleration = 9.8 m/s^2,"t=0.3s, distance_ball_camera = 1.7060m
+2202,captured_0010s,lab,A3SS,24,DS,What is that ball's acceleration at 0.6s in m/s^2? ,gravity_acceleration = 9.8 m/s^2,"t=0.3s, distance_ball_camera = 1.7060m
 t=0.6s, distance_ball_camera = 1.3440m
 t=0.9s, distance_ball_camera = 1.4605m
 t=1.2s, distance_ball_camera = 1.7840m
@@ -5188,14 +5188,14 @@ t=1.2s, distance_ball_camera = 1.7840m
 t=1.5s, distance_ball_camera = 1.7170m
 t=1.8s, distance_ball_camera = 1.3500m
 ",
-2207,captured_0010X,lab,A3SX,24,DS,What is that ball's acceleration at 0.3s in m/s? ,gravity_acceleration = 9.8 m/s^2,"t=0.3s, distance_ball_camera = 1.7060m
+2207,captured_0010X,lab,A3SX,24,DS,What is that ball's acceleration at 0.3s in m/s^2? ,gravity_acceleration = 9.8 m/s^2,"t=0.3s, distance_ball_camera = 1.7060m
 t=0.6s, distance_ball_camera = 1.3440m
 t=0.9s, distance_ball_camera = 1.4605m
 t=1.2s, distance_ball_camera = 1.7840m
 t=1.5s, distance_ball_camera = 1.7170m
 t=1.8s, distance_ball_camera = 1.3500m
 ",
-2208,captured_0010X,lab,A3SX,24,DS,What is that ball's acceleration at 0.6s in m/s? ,gravity_acceleration = 9.8 m/s^2,"t=0.3s, distance_ball_camera = 1.7060m
+2208,captured_0010X,lab,A3SX,24,DS,What is that ball's acceleration at 0.6s in m/s^2? ,gravity_acceleration = 9.8 m/s^2,"t=0.3s, distance_ball_camera = 1.7060m
 t=0.6s, distance_ball_camera = 1.3440m
 t=0.9s, distance_ball_camera = 1.4605m
 t=1.2s, distance_ball_camera = 1.7840m
@@ -5796,13 +5796,13 @@ distance_far_person_camera = 3.130m",
 2302,captured_0018,lab,A3MC,24,DD,What is the velocity of the box at 3.4s in cm/s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
 distance_near_person_camera = 2.002m
 distance_far_person_camera = 3.130m",
-2303,captured_0018,lab,A3MC,24,DD,What is the velocity of the soccer ball at 3.4s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
+2303,captured_0018,lab,A3MC,24,DD,What is the velocity of the soccer ball at 3.4s in cm/s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
 distance_near_person_camera = 2.002m
 distance_far_person_camera = 3.130m",
-2304,captured_0018,lab,A3MC,24,DD,What is the velocity of the tennis ball at 3.4s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
+2304,captured_0018,lab,A3MC,24,DD,What is the velocity of the tennis ball at 3.4s in cm/s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
 distance_near_person_camera = 2.002m
 distance_far_person_camera = 3.130m",
-2305,captured_0018,lab,A3MC,24,DD,What is the velocity of the pineapple toy at 3.4s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
+2305,captured_0018,lab,A3MC,24,DD,What is the velocity of the pineapple toy at 3.4s in cm/s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
 distance_near_person_camera = 2.002m
 distance_far_person_camera = 3.130m",
 2306,captured_0018,lab,A3MC,24,DS,What is the distance between the box and the soccer ball in cm at 3.0s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
@@ -5853,13 +5853,13 @@ distance_far_person_camera = 3.130m",
 2321,captured_0018s,lab,A3MS,24,DD,What is the velocity of the box at 3.4s in cm/s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
 distance_near_person_camera = 2.002m
 distance_far_person_camera = 3.130m",
-2322,captured_0018s,lab,A3MS,24,DD,What is the velocity of the soccer ball at 3.4s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
+2322,captured_0018s,lab,A3MS,24,DD,What is the velocity of the soccer ball at 3.4s in cm/s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
 distance_near_person_camera = 2.002m
 distance_far_person_camera = 3.130m",
-2323,captured_0018s,lab,A3MS,24,DD,What is the velocity of the tennis ball at 3.4s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
+2323,captured_0018s,lab,A3MS,24,DD,What is the velocity of the tennis ball at 3.4s in cm/s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
 distance_near_person_camera = 2.002m
 distance_far_person_camera = 3.130m",
-2324,captured_0018s,lab,A3MS,24,DD,What is the velocity of the pineapple toy at 3.4s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
+2324,captured_0018s,lab,A3MS,24,DD,What is the velocity of the pineapple toy at 3.4s in cm/s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
 distance_near_person_camera = 2.002m
 distance_far_person_camera = 3.130m",
 2325,captured_0018s,lab,A3MS,24,DS,What is the distance between the box and the soccer ball in cm at 3.0s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
@@ -5910,13 +5910,13 @@ distance_far_person_camera = 3.130m",
 2340,captured_0018x,lab,A3MX,24,DD,What is the velocity of the box at 3.4s in cm/s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
 distance_near_person_camera = 2.002m
 distance_far_person_camera = 3.130m",
-2341,captured_0018x,lab,A3MX,24,DD,What is the velocity of the soccer ball at 3.4s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
+2341,captured_0018x,lab,A3MX,24,DD,What is the velocity of the soccer ball at 3.4s in cm/s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
 distance_near_person_camera = 2.002m
 distance_far_person_camera = 3.130m",
-2342,captured_0018x,lab,A3MX,24,DD,What is the velocity of the tennis ball at 3.4s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
+2342,captured_0018x,lab,A3MX,24,DD,What is the velocity of the tennis ball at 3.4s in cm/s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
 distance_near_person_camera = 2.002m
 distance_far_person_camera = 3.130m",
-2343,captured_0018x,lab,A3MX,24,DD,What is the velocity of the pineapple toy at 3.4s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
+2343,captured_0018x,lab,A3MX,24,DD,What is the velocity of the pineapple toy at 3.4s in cm/s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
 distance_near_person_camera = 2.002m
 distance_far_person_camera = 3.130m",
 2344,captured_0018x,lab,A3MX,24,DS,What is the distance between the box and the soccer ball in cm at 3.0s?,Gravity acc = 9.8m/s^2,"distance_soccer_ball_camera =2.8000m
@@ -5953,11 +5953,11 @@ distance_far_person_camera = 3.2370m",
 t=0.60s, distance_carrot_camera = 2.6300m
 distance_near_person_camera = 1.5800m
 distance_far_person_camera = 3.2370m",
-2354,captured_0020,lab,A3MC,24,DD,What is the velocity of the yellow toy at 0.60s cm/s?,Gravity acc = 9.8m/s^2,"t=0.60s, distance_jar_camera =1.9735m
+2354,captured_0020,lab,A3MC,24,DD,What is the velocity of the yellow toy at 0.60s in cm/s?,Gravity acc = 9.8m/s^2,"t=0.60s, distance_jar_camera =1.9735m
 t=0.60s, distance_carrot_camera = 2.6300m
 distance_near_person_camera = 1.5800m
 distance_far_person_camera = 3.2370m",
-2355,captured_0020,lab,A3MC,24,DD,What is the velocity of the white jar at 0.60s cm/s?,Gravity acc = 9.8m/s^2,"t=0.60s, distance_jar_camera =1.9735m
+2355,captured_0020,lab,A3MC,24,DD,What is the velocity of the white jar at 0.60s in cm/s?,Gravity acc = 9.8m/s^2,"t=0.60s, distance_jar_camera =1.9735m
 t=0.60s, distance_carrot_camera = 2.6300m
 distance_near_person_camera = 1.5800m
 distance_far_person_camera = 3.2370m",
@@ -5985,11 +5985,11 @@ distance_far_person_camera = 3.2370m",
 t=0.60s, distance_carrot_camera = 2.6300m
 distance_near_person_camera = 1.5800m
 distance_far_person_camera = 3.2370m",
-2362,captured_0020s,lab,A3MS,24,DD,What is the velocity of the yellow toy at 0.60s cm/s?,Gravity acc = 9.8m/s^2,"t=0.60s, distance_jar_camera =1.9735m
+2362,captured_0020s,lab,A3MS,24,DD,What is the velocity of the yellow toy at 0.60s in cm/s?,Gravity acc = 9.8m/s^2,"t=0.60s, distance_jar_camera =1.9735m
 t=0.60s, distance_carrot_camera = 2.6300m
 distance_near_person_camera = 1.5800m
 distance_far_person_camera = 3.2370m",
-2363,captured_0020s,lab,A3MS,24,DD,What is the velocity of the white jar at 0.60s cm/s?,Gravity acc = 9.8m/s^2,"t=0.60s, distance_jar_camera =1.9735m
+2363,captured_0020s,lab,A3MS,24,DD,What is the velocity of the white jar at 0.60s in cm/s?,Gravity acc = 9.8m/s^2,"t=0.60s, distance_jar_camera =1.9735m
 t=0.60s, distance_carrot_camera = 2.6300m
 distance_near_person_camera = 1.5800m
 distance_far_person_camera = 3.2370m",
@@ -6017,11 +6017,11 @@ distance_far_person_camera = 3.2370m",
 t=0.60s, distance_carrot_camera = 2.6300m
 distance_near_person_camera = 1.5800m
 distance_far_person_camera = 3.2370m",
-2370,captured_0020x,lab,A3MX,24,DD,What is the velocity of the yellow toy at 0.60s cm/s?,Gravity acc = 9.8m/s^2,"t=0.60s, distance_jar_camera =1.9735m
+2370,captured_0020x,lab,A3MX,24,DD,What is the velocity of the yellow toy at 0.60s in cm/s?,Gravity acc = 9.8m/s^2,"t=0.60s, distance_jar_camera =1.9735m
 t=0.60s, distance_carrot_camera = 2.6300m
 distance_near_person_camera = 1.5800m
 distance_far_person_camera = 3.2370m",
-2371,captured_0020x,lab,A3MX,24,DD,What is the velocity of the white jar at 0.60s cm/s?,Gravity acc = 9.8m/s^2,"t=0.60s, distance_jar_camera =1.9735m
+2371,captured_0020x,lab,A3MX,24,DD,What is the velocity of the white jar at 0.60s in cm/s?,Gravity acc = 9.8m/s^2,"t=0.60s, distance_jar_camera =1.9735m
 t=0.60s, distance_carrot_camera = 2.6300m
 distance_near_person_camera = 1.5800m
 distance_far_person_camera = 3.2370m",
@@ -6586,13 +6586,13 @@ t=1.6s, distance_ball_camera=1.0270m",
 2493,captured_0029,lab,S3SC,24,SS,What is the width of the table in cm?,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
 t=1.24s (hit whiteboard), distance_ball_camera=1.1440m
 t=1.6s, distance_ball_camera=1.0270m",
-2494,captured_0029,lab,S3SC,24,SD,What is the velocity of the tennis ball at 1.0s in cm/s??,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
+2494,captured_0029,lab,S3SC,24,SD,What is the velocity of the tennis ball at 1.0s in cm/s?,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
 t=1.24s (hit whiteboard), distance_ball_camera=1.1440m
 t=1.6s, distance_ball_camera=1.0270m",
 2495,captured_0029,lab,S3SC,24,SD,What is the velocity of the tennis ball when it hits the whiteboard in cm/s?,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
 t=1.24s (hit whiteboard), distance_ball_camera=1.1440m
 t=1.6s, distance_ball_camera=1.0270m",
-2496,captured_0029,lab,S3SC,24,SD,What is the velocity of the tennis ball at 1.6s in cm/s??,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
+2496,captured_0029,lab,S3SC,24,SD,What is the velocity of the tennis ball at 1.6s in cm/s?,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
 t=1.24s (hit whiteboard), distance_ball_camera=1.1440m
 t=1.6s, distance_ball_camera=1.0270m",
 2497,captured_0029,lab,S3SC,24,SS,What is the distance travelled by the tennis ball when it hits the whiteboard in cm?,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
@@ -6604,10 +6604,10 @@ t=1.6s, distance_ball_camera=1.0270m",
 2499,captured_0029s,lab,S3SS,24,SS,What is the width of the table in cm?,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
 t=1.24s (hit whiteboard), distance_ball_camera=1.1440m
 t=1.6s, distance_ball_camera=1.0270m",
-2500,captured_0029s,lab,S3SS,24,SD,What is the velocity of the tennis ball at 1.0s in cm/s??,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
+2500,captured_0029s,lab,S3SS,24,SD,What is the velocity of the tennis ball at 1.0s in cm/s?,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
 t=1.24s (hit whiteboard), distance_ball_camera=1.1440m
 t=1.6s, distance_ball_camera=1.0270m",
-2501,captured_0029s,lab,S3SS,24,SD,What is the velocity of the tennis ball at 1.6s in cm/s??,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
+2501,captured_0029s,lab,S3SS,24,SD,What is the velocity of the tennis ball at 1.6s in cm/s?,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
 t=1.24s (hit whiteboard), distance_ball_camera=1.1440m
 t=1.6s, distance_ball_camera=1.0270m",
 2502,captured_0029s,lab,S3SS,24,SS,What is the distance travelled by the tennis ball when it hits the whiteboard in cm?,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
@@ -6619,10 +6619,10 @@ t=1.6s, distance_ball_camera=1.0270m",
 2504,captured_0029x,lab,S3SX,24,SS,What is the width of the table in cm?,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
 t=1.24s (hit whiteboard), distance_ball_camera=1.1440m
 t=1.6s, distance_ball_camera=1.0270m",
-2505,captured_0029x,lab,S3SX,24,SD,What is the velocity of the tennis ball at 1.0s in cm/s??,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
+2505,captured_0029x,lab,S3SX,24,SD,What is the velocity of the tennis ball at 1.0s in cm/s?,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
 t=1.24s (hit whiteboard), distance_ball_camera=1.1440m
 t=1.6s, distance_ball_camera=1.0270m",
-2506,captured_0029x,lab,S3SX,24,SD,What is the velocity of the tennis ball at 1.6s in cm/s??,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
+2506,captured_0029x,lab,S3SX,24,SD,What is the velocity of the tennis ball at 1.6s in cm/s?,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
 t=1.24s (hit whiteboard), distance_ball_camera=1.1440m
 t=1.6s, distance_ball_camera=1.0270m",
 2507,captured_0029x,lab,S3SX,24,SS,What is the distance travelled by the tennis ball when it hits the whiteboard in cm?,diameter of the tennis ball = 6.7cm,"t=1.00s, distance_ball_camera=0.901s
@@ -7176,7 +7176,7 @@ t=1.4s, distance_soccer_ball_camera = 2.3730 m",
 t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
 2667,captured_0036,lab,S3SC,24,SD,What is the ping pong ball's velocity at 1.4s in cm/s? ,diameter of the ping pong ball = 4cm,"t=0.9s, distance_ping_pong_ball_camera = 1.0100m
 t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
-2668,captured_0036,lab,S3SC,24,SS,What is the ping pong ball's displacement between 0.9s and 1.4s in cm/s?,diameter of the ping pong ball = 4cm,"t=0.9s, distance_ping_pong_ball_camera = 1.0100m
+2668,captured_0036,lab,S3SC,24,SS,What is the ping pong ball's displacement between 0.9s and 1.4s in cm?,diameter of the ping pong ball = 4cm,"t=0.9s, distance_ping_pong_ball_camera = 1.0100m
 t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
 2669,captured_0036,lab,S3SC,24,SS,What is the width of the table in the video in meters? ,diameter of the ping pong ball = 4cm,"t=0.9s, distance_ping_pong_ball_camera = 1.0100m
 t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
@@ -7186,7 +7186,7 @@ t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
 t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
 2672,captured_0036s,lab,S3SS,24,SD,What is the ping pong ball's velocity at 1.4s in cm/s? ,diameter of the ping pong ball = 4cm,"t=0.9s, distance_ping_pong_ball_camera = 1.0100m
 t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
-2673,captured_0036s,lab,S3SS,24,SS,What is the ping pong ball's displacement between 0.9s and 1.4s in cm/s?,diameter of the ping pong ball = 4cm,"t=0.9s, distance_ping_pong_ball_camera = 1.0100m
+2673,captured_0036s,lab,S3SS,24,SS,What is the ping pong ball's displacement between 0.9s and 1.4s in cm?,diameter of the ping pong ball = 4cm,"t=0.9s, distance_ping_pong_ball_camera = 1.0100m
 t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
 2674,captured_0036s,lab,S3SS,24,SS,What is the width of the table in the video in meters? ,diameter of the ping pong ball = 4cm,"t=0.9s, distance_ping_pong_ball_camera = 1.0100m
 t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
@@ -7196,7 +7196,7 @@ t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
 t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
 2677,captured_0036x,lab,S3SX,24,SD,What is the ping pong ball's velocity at 1.4s in cm/s? ,diameter of the ping pong ball = 4cm,"t=0.9s, distance_ping_pong_ball_camera = 1.0100m
 t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
-2678,captured_0036x,lab,S3SX,24,SS,What is the ping pong ball's displacement between 0.9s and 1.4s in cm/s?,diameter of the ping pong ball = 4cm,"t=0.9s, distance_ping_pong_ball_camera = 1.0100m
+2678,captured_0036x,lab,S3SX,24,SS,What is the ping pong ball's displacement between 0.9s and 1.4s in cm?,diameter of the ping pong ball = 4cm,"t=0.9s, distance_ping_pong_ball_camera = 1.0100m
 t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
 2679,captured_0036x,lab,S3SX,24,SS,What is the width of the table in the video in meters? ,diameter of the ping pong ball = 4cm,"t=0.9s, distance_ping_pong_ball_camera = 1.0100m
 t=1.4s, distance_ping_pong_ball_camera = 0.7160m",
@@ -8623,8 +8623,8 @@ distance_mario_toy_camera = 2.0160m",
 3079,internet_0044,internet,V2MS,30,DS,What is the height of the plate in cm? ,gravity acceleration = 9.8 m/s^2,,
 3080,internet_0044,internet,V2MS,30,DS,What is the distance between the kettle and the plate in cm? ,gravity acceleration = 9.8 m/s^2,,
 3081,internet_0044,internet,V2MS,30,DS,What is the distance between the cylinder and the plastic bottle in cm? ,gravity acceleration = 9.8 m/s^2,,
-3082,internet_0044,internet,V2MS,30,DS,What is the velocity of the white ball at 1.50s in m/s^2? ,gravity acceleration = 9.8 m/s^2,,
-3083,internet_0044,internet,V2MS,30,DS,What is the velocity of the white ball at 2.50s in m/s^2? ,gravity acceleration = 9.8 m/s^2,,
+3082,internet_0044,internet,V2MS,30,DS,What is the velocity of the white ball at 1.50s in m/s? ,gravity acceleration = 9.8 m/s^2,,
+3083,internet_0044,internet,V2MS,30,DS,What is the velocity of the white ball at 2.50s in m/s? ,gravity acceleration = 9.8 m/s^2,,
 3084,internet_0045,internet,V2MS,30,DS,What is the diameter of the rolling cylinder in cm? ,velocity of the rolling cylinder = 107.3 cm/s,,
 3085,internet_0045,internet,V2MS,30,DS,What is the height of the green bottle in cm? ,velocity of the rolling cylinder = 107.3 cm/s,,
 3086,internet_0045,internet,V2MS,30,DS,What is the height of the plastic bottle in cm? ,velocity of the rolling cylinder = 107.3 cm/s,,
@@ -8640,7 +8640,7 @@ distance_mario_toy_camera = 2.0160m",
 3096,internet_0047,internet,V2SS,30,DS,What is the diameter of the rolling ball in cm? ,velocity of the rolling ball at 0.5s = 2.94m/s,,
 3097,internet_0047,internet,V2SS,30,DS,What is distance between the two vertical red lines in meters? ,velocity of the rolling ball at 0.5s = 2.94m/s,,
 3098,internet_0047,internet,V2SS,30,DS,What is distance between the ball and the white line in meters? ,velocity of the rolling ball at 0.5s = 2.94m/s,,
-3099,internet_0047,internet,V2SS,30,DS,What is displacement of the ball between 0.10s and 0.30sin meters? ,velocity of the rolling ball at 0.5s = 2.94m/s,,
+3099,internet_0047,internet,V2SS,30,DS,What is displacement of the ball between 0.10s and 0.30s in meters? ,velocity of the rolling ball at 0.5s = 2.94m/s,,
 3100,internet_0047,internet,V2SS,30,DS,What is distance between the red vertical line on the left and the white line in meters? ,velocity of the rolling ball at 0.5s = 2.94m/s,,
 3101,internet_0047,internet,V2SS,30,DS,What is width of the lines on the floor in cm? ,velocity of the rolling ball at 0.5s = 2.94m/s,,
 3102,internet_0048,internet,A2SS,30,DS,What is the diameter of the ball in cm? ,gravity acceleration = 9.8 m/s^2,,
@@ -8745,7 +8745,7 @@ distance_mario_toy_camera = 2.0160m",
 3201,internet_0062,internet,A2SS,30,DS,What is the length of the longer side of the wallet in cm? ,gravity acceleration = 9.8 m/s^2,,
 3202,internet_0062,internet,A2SS,30,DS,What is the length of the shorter side of the wallet in cm? ,gravity acceleration = 9.8 m/s^2,,
 3203,internet_0062,internet,A2SS,30,DD,What is the velocity of the wallet at 2.50s in m/s? ,gravity acceleration = 9.8 m/s^2,,
-3204,internet_0062,internet,A2SS,30,DS,What is the distance between the bottom corner of the wallet and the floor at 2.50s in m/s? ,gravity acceleration = 9.8 m/s^2,,
+3204,internet_0062,internet,A2SS,30,DS,What is the distance between the bottom corner of the wallet and the floor at 2.50s in meters? ,gravity acceleration = 9.8 m/s^2,,
 3205,internet_0062,internet,A2SS,30,DS,What is the displacement of the wallet between 2.20s and 2.50s in meters?,gravity acceleration = 9.8 m/s^2,,
 3206,internet_0062,internet,A2SS,30,DD,What is the velocity of the wallet at 2.60s in m/s? ,gravity acceleration = 9.8 m/s^2,,
 3207,internet_0063,internet,A2SS,30,DS,What is the height of the water bottle in cm?,gravity acceleration = 9.8 m/s^2,,
@@ -8804,7 +8804,7 @@ distance_mario_toy_camera = 2.0160m",
 3260,internet_0070,internet,V2SC,30,DS,What is the height of the speedboat in meters?,velocity of the speedboat at 1.00s = 11 m/s,,
 3261,internet_0070,internet,V2SC,30,DS,What is the displacement of the speedboat between 1.00s and 4.00s in meters?,velocity of the speedboat at 1.00s = 11 m/s,,
 3262,internet_0070,internet,V2SC,30,DS,What is the displacement of the speedboat between 2.00s and 3.00s in meters?,velocity of the speedboat at 1.00s = 11 m/s,,
-3263,internet_0070,internet,V2SC,30,DD,What is the velocity of the speed boat at 2.00s? ,velocity of the speedboat at 1.00s = 11 m/s,,
+3263,internet_0070,internet,V2SC,30,DD,What is the velocity of the speed boat at 2.00s in m/s?,velocity of the speedboat at 1.00s = 11 m/s,,
 3264,internet_0071,internet,S2SS,30,SS,What is the diameter of the toilet paper roll in cm?,width of the toilet paper = 10 cm,,
 3265,internet_0071,internet,S2SS,30,SS,What is the length of the toilet paper holder in cm?,width of the toilet paper = 10 cm,,
 3266,internet_0071,internet,S2SS,30,SS,What is the length of a wall tile in cm?,width of the toilet paper = 10 cm,,
@@ -8815,7 +8815,7 @@ distance_mario_toy_camera = 2.0160m",
 3271,internet_0072,internet,S2SS,30,SS,What is the width of the credit card in cm? ,lenth of the credit card = 8.56 cm,,
 3272,internet_0072,internet,S2SS,30,SD,What is the moving velocity of the credit card at 0.50s in cm/s?,lenth of the credit card = 8.56 cm,,
 3273,internet_0072,internet,S2SS,30,SD,What is the moving velocity of the credit card at 1.00s in cm/s?,lenth of the credit card = 8.56 cm,,
-3274,internet_0072,internet,S2SS,30,SD,What is the acceleration of the credit card at 0.50s in cm/s? ,lenth of the credit card = 8.56 cm,,
+3274,internet_0072,internet,S2SS,30,SD,What is the acceleration of the credit card at 0.50s in cm/s^2? ,lenth of the credit card = 8.56 cm,,
 3275,internet_0073,internet,S2MC,30,SS,What is the distance between the blue bag and the yellow bag in meters? ,velocity of the conveyor belt = 0.3m/s,,
 3276,internet_0073,internet,S2MC,30,SS,What is the width of the red package in meters?,velocity of the conveyor belt = 0.3m/s,,
 3277,internet_0073,internet,S2MC,30,SS,What is the height of the red package in meters?,velocity of the conveyor belt = 0.3m/s,,

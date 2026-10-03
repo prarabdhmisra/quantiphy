@@ -15,7 +15,14 @@ organizers and is not present here.
 
 ## The submission template is the contract
 
-Retrieved **2026-08-02**, 739,113 bytes,
+Retrieved **2026-10-02**, 739,115 bytes, `Last-Modified: Mon, 14 Sep 2026 19:16:15 GMT`,
+SHA-256 `5f1e8367308ebaee6718929d74a175fecd6813a8d5862fc72a709d07d2328c18`. This is the organizers'
+2026-09-14 erratum: 32 target units corrected and 59 punctuation fixes in `question` only, with ids,
+row order and every other column unchanged. `test_dataset.parquet` was refreshed the same day from HF
+main (2026-09-28 commit: video_type on 5 ids and depth_info typos). The template still carries the
+*old* video_type on those 5 ids; `tests/test_submission.py::RELABELLED_IDS` pins that disagreement.
+
+Previous pin, retrieved **2026-08-02**: 739,113 bytes,
 SHA-256 `1d46a24a3c97723f24ac5051282f67e915a75f16214c8f3ff5a0b4d7bd23a93b`.
 
 **Re-verified 2026-08-05** after the organizers wrote that they had "updated the webpage with a new

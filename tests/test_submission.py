@@ -61,14 +61,22 @@ def test_template_is_the_official_test_split(template: pd.DataFrame) -> None:
     assert (template["parsed_value"] == "").all()
 
 
+#: The organizers' 2026-09-28 parquet fix relabelled 2D/3D on these ids, but the live template
+#: (last changed 2026-09-14) still carries the old video_type. Their two files disagree here.
+RELABELLED_IDS = frozenset({1099, 1100, 1985, 1986, 1987})
+
+
 def test_template_matches_the_test_parquet_row_for_row(template: pd.DataFrame) -> None:
     """`id` is the parquet row index plus one. Everything downstream assumes this."""
     parquet = pd.read_parquet(ROOT / "data" / "fixtures" / "test_dataset.parquet")
 
     assert len(parquet) == len(template)
-    for column in ("video_id", "video_source", "video_type", "inference_type", "question"):
+    for column in ("video_id", "video_source", "inference_type", "question"):
         assert template[column].tolist() == parquet[column].astype(str).tolist()
     assert template["ground_truth_prior"].tolist() == parquet["prior"].astype(str).tolist()
+
+    differs = template["video_type"] != parquet["video_type"].astype(str)
+    assert set(template.loc[differs, "id"].astype(int)) == RELABELLED_IDS
 
 
 # --- building a submission -----------------------------------------------------------------

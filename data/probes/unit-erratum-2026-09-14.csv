@@ -1,0 +1,17 @@
+id,source,value,reason
+1131,solver-replay,0.9053949138609654,speed/displacement re-solved on corrected question
+1225,solver-replay,0.986343002244389,speed/displacement re-solved on corrected question
+1631,solver-replay,1.9774689932144616,speed/displacement re-solved on corrected question
+2668,solver-replay,1.0201285997371454,speed/displacement re-solved on corrected question
+2673,solver-replay,3.034028297124568,speed/displacement re-solved on corrected question
+2678,solver-replay,0.1259655409965012,speed/displacement re-solved on corrected question
+3204,constant,1.25,"old value was g*t in the wrong unit; per-(category,unit) median"
+2303,constant,102.65,"old value was g*t in the wrong unit; per-(category,unit) median"
+2304,constant,102.65,"old value was g*t in the wrong unit; per-(category,unit) median"
+2305,constant,102.65,"old value was g*t in the wrong unit; per-(category,unit) median"
+2322,constant,102.65,"old value was g*t in the wrong unit; per-(category,unit) median"
+2323,constant,102.65,"old value was g*t in the wrong unit; per-(category,unit) median"
+2324,constant,102.65,"old value was g*t in the wrong unit; per-(category,unit) median"
+2341,constant,102.65,"old value was g*t in the wrong unit; per-(category,unit) median"
+2342,constant,102.65,"old value was g*t in the wrong unit; per-(category,unit) median"
+2343,constant,102.65,"old value was g*t in the wrong unit; per-(category,unit) median"
